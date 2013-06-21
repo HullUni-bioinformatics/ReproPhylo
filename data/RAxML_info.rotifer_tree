@@ -1,0 +1,100 @@
+
+
+IMPORTANT WARNING: Sequences Brachionus_quadridentatus_JX216583 and Brachionus_quadridentatus_JX216580 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_plicatilis_FJ387485 and Brachionus_plicatilis_FJ387481 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_plicatilis_FJ387485 and Brachionus_plicatilis_FJ387478 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_havanaensis_JX216551 and Brachionus_havanaensis_JX216544 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_havanaensis_JX216551 and Brachionus_havanaensis_JX216533 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_falcatus_JX216529 and Brachionus_falcatus_JX216530 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_manjavacas_FR729683 and Brachionus_manjavacas_FR729678 are exactly identical
+
+
+IMPORTANT WARNING: Sequences Brachionus_manjavacas_FR729682 and Brachionus_manjavacas_EF017651 are exactly identical
+
+IMPORTANT WARNING
+Found 8 sequences that are exactly identical to other sequences in the alignment.
+Normally they should be excluded from the analysis.
+
+An alignment file with sequence duplicates removed has already
+been printed to file data/phylip_aligned.phy.reduced
+
+
+This is RAxML version 7.2.8 released by Alexandros Stamatakis in October 2010.
+
+With greatly appreciated code contributions by:
+Andre Aberer (TUM)
+Simon Berger (TUM)
+John Cazes (TACC)
+Michael Ott (TUM)
+Nick Pattengale (UNM)
+Wayne Pfeiffer (SDSC)
+Akifumi S. Tanabe (Univ. Tsukuba)
+
+
+Alignment has 264 distinct alignment patterns
+
+Proportion of gaps and completely undetermined characters in this alignment: 7.93%
+
+RAxML rapid hill-climbing mode
+
+Using 1 distinct models/data partitions with joint branch length optimization
+
+
+Executing 1 inferences on the original alignment using 1 distinct randomized MP trees
+
+All free model parameters will be estimated by RAxML
+ML estimate of 25 per site rate categories
+
+Likelihood of final tree will be evaluated and optimized under GAMMA
+
+GAMMA Model parameters will be estimated up to an accuracy of 0.1000000000 Log Likelihood units
+
+Partition: 0
+Alignment Patterns: 264
+Name: No Name Provided
+DataType: DNA
+Substitution Matrix: GTR
+
+
+
+
+RAxML was called as follows:
+
+raxmlHPC-PTHREADS-SSE3 -m GTRCAT -n rotifer_tree -p 10000 -s data/phylip_aligned.phy -w /Users/stevemoss/Dropbox/PhD/Research/Reproducible_Phylogenetics/ReproPhylo/data 
+
+
+Inference[0]: Time 1.634852 CAT-based likelihood -2881.817396, best rearrangement setting 5
+alpha[0]: 1.000000 rates[0] ac ag at cg ct gt: 0.000017 6.158119 0.570370 0.000017 8.591056 1.000000 
+
+
+Conducting final model optimizations on all 1 trees under GAMMA-based models ....
+
+Testing which likelihood implementation to use
+Standard Implementation full tree traversal time: 0.003681
+Subtree Equality Vectors for gap columns full tree traversal time: 0.003470
+... using standard implementation
+
+Inference[0] final GAMMA-based Likelihood: -3514.418155 tree written to file /Users/stevemoss/Dropbox/PhD/Research/Reproducible_Phylogenetics/ReproPhylo/data/RAxML_result.rotifer_tree
+
+
+Starting final GAMMA-based thorough Optimization on tree 0 likelihood -3514.418155 .... 
+
+Final GAMMA-based Score of best tree -3513.401426
+
+Program execution info written to /Users/stevemoss/Dropbox/PhD/Research/Reproducible_Phylogenetics/ReproPhylo/data/RAxML_info.rotifer_tree
+Best-scoring ML tree written to: /Users/stevemoss/Dropbox/PhD/Research/Reproducible_Phylogenetics/ReproPhylo/data/RAxML_bestTree.rotifer_tree
+
+Overall execution time: 3.019449 secs or 0.000839 hours or 0.000035 days
+
