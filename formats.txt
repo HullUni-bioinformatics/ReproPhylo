@@ -1,0 +1,14 @@
+RAxML_bestTree.rotifer_tree	None
+RAxML_log.rotifer_tree	None
+..	None
+RAxML_parsimonyTree.rotifer_tree	None
+.	None
+RAxML_result.rotifer_tree	None
+22_rotifer_COI_seqs.fas	fasta
+phylip_aligned.phy.reduced	phylip
+RAxML_info.rotifer_tree	phylip
+RAxML_result.rotifer_tree.xml	phylip
+mafft_aligned.txt	phylip
+phylip_aligned.phy	phylip
+mafft_aligned.fasta	fasta
+YR_corrected.mafft_trim07.fas.phy.reduced	phylip
