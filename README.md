@@ -14,3 +14,6 @@ Not done:
 * List all seq features, with counts
 * List all CDS names, with counts
 * Allow selection of feature/CDS names
+
+## Basic manipulation and configuration of input
+Often raw data needs some tidying up. Could also use seqmagick package?
