@@ -1,5 +1,5 @@
 ## ReproPhylo: Reproducible Phylogenetics
-This is a place to make a plan!
+This is a place to make a plan! Or should it be in the wiki??
 
 ## EDA: Exploratory Data Analysis of Input
 The idea here is to quantify and characterise the raw sequence data.
