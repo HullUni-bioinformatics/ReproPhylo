@@ -8,7 +8,9 @@ Works on genbank files, though might need more extensive testing.
 Done:
 * Characterise lengths and plot out distribution of lengths
 * Characterise %GC and plot out distribution of %GC
+* Allow selection of range %GC and length sequences
 
 Not done:
 * List all seq features, with counts
 * List all CDS names, with counts
+* Allow selection of feature/CDS names
