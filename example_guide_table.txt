@@ -1,0 +1,4 @@
+dna
+CDS	cox1,COX1,coi,COI,CoI
+CDS	nd5,ND5,nadh5,NADH5
+rRNA	18s,18S,SSU,18S ribosomal RNA
