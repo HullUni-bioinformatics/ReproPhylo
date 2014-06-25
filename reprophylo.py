@@ -1,14 +1,15 @@
 
 from Bio import SeqIO
-import os, csv, sys, dendropy
+import os, csv, sys, dendropy, re, time, random
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation
-from Bio.Align.Applications import MafftCommandline
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
+from Bio.Align.Applications import MafftCommandline, MuscleCommandline
 from StringIO import StringIO 
 from Bio import AlignIO 
 from Bio.Phylo.Applications import RaxmlCommandline
+from Bio.Align import MultipleSeqAlignment
 from cogent import LoadSeqs, LoadTree
 from cogent.app.raxml_v730 import build_tree_from_alignment
 from ete2 import *
@@ -62,25 +63,27 @@ if __name__ == "__main__":
     doctest.testmod() 
        
 
-class Set:
+class Concatenation:
     
     name = 'NotSet'
     loci = []
-    concat_meta = 'NotSet'
+    otu_meta = 'NotSet'
     concat_must_have_all_of = []
     concat_must_have_one_of = []
+    feature_id_dict = {}
     
     def __init__(self,
                  name = name,
                  loci = loci,
-                 concat_meta = concat_meta,
+                 otu_meta = otu_meta,
                  concat_must_have_all_of = concat_must_have_all_of,
                  concat_must_have_one_of = concat_must_have_one_of):
         self.name = name
         self.loci = loci
-        self.concat_meta = concat_meta
+        self.otu_meta = otu_meta
         self.concat_must_have_all_of = concat_must_have_all_of
         self.concat_must_have_one_of = concat_must_have_one_of
+        self.feature_id_dict = {}
         seen = []
         for locus in loci:
             if not isinstance(locus, Locus):
@@ -165,37 +168,51 @@ def dwindle_record(record, loci):
     return record
             
            
-def guess_format(input_filename):
-    
-    """ Runs a perl script that returns the input's format
-    
-    >>> filename = 'data/22_rotifer_COI_seqs.fas'
-    >>> print guess_format(filename)
-    fasta"""
-    
-    if os.path.exists(input_filename):
-        os.system('perl guesser.pl ' + input_filename)
-        guess = open(input_filename + '.format','r').read();
-        os.remove(input_filename + '.format')
-        return guess
-    else:
-        sys.exit('Cannot guess ' + input_filename + '. Does it exist?')
+#def guess_format(input_filename):
+#    
+#    """ Runs a perl script that returns the input's format
+#    
+#    >>> filename = 'data/22_rotifer_COI_seqs.fas'
+#    >>> print guess_format(filename)
+#    fasta"""
+#    
+#    if os.path.exists(input_filename):
+#        os.system('perl guesser.pl ' + input_filename)
+#        guess = open(input_filename + '.format','r').read();
+#        os.remove(input_filename + '.format')
+#        return guess
+#    else:
+#        sys.exit('Cannot guess ' + input_filename + '. Does it exist?')
       
+#def is_embl_or_gb(input_filename):
+#    
+#    """ Using the guess_format() function to check if the input conforms with
+#        embl or genbank formats.
+#    """ 
+#    
+#    input_format = guess_format(input_filename)
+#    if input_format == 'embl' or input_format == 'genbank':
+#        return True
+#    else:
+#        return False
+
 def is_embl_or_gb(input_filename):
-    
-    """ Using the guess_format() function to check if the input conforms with
-        embl or genbank formats.
-    """ 
-    
-    input_format = guess_format(input_filename)
-    if input_format == 'embl' or input_format == 'genbank':
-        return True
-    else:
-        return False
+    suffices = ['.gb','.embl']
+    gb = False
+    for s in suffices:
+        if s in input_filename:
+            gb = True
+    return gb
 
-def parse_input(input_filename):
-    return SeqIO.parse(input_filename, guess_format(input_filename))
+def parse_input(input_filename, fmt):
+    return SeqIO.parse(input_filename, fmt)
 
+def generate_pickle_filename():
+    t = time.ctime(None)+'_'+str(random.random())
+    t = re.sub(' ','_',t)
+    t = re.sub(':','_',t)
+    t = re.sub('\.','_',t)
+    return t+'.pkl'
 
 def list_to_string(List):
     
@@ -234,6 +251,8 @@ def type_to_single_line_str(var):
 
 
 def get_qualifiers_dictionary(database, feature_id):
+    if type(feature_id) is list:
+        feature_id = feature_id[0]
     record_id = feature_id.split('_')[0]
     qualifiers_dictionary={}
     for record in database.records:
@@ -249,7 +268,18 @@ def get_qualifiers_dictionary(database, feature_id):
                         qualifiers_dictionary[qualifier]=feature.qualifiers[qualifier][0]
     return qualifiers_dictionary
 
-
+def seq_format_from_suffix(suffix):
+    suffices = {'fasta': ['fas','fasta','fa','fna'],
+                'genbank': ['gb','genbank'],
+                'embl': ['embl']}
+    found = False
+    for key in suffices.keys():
+        if suffix in suffices[key]:
+            found = True
+            return key
+    if not found:
+        raise RuntimeError(suffix+' is not a recognised suffix of an unaligned sequence file')
+        
 class Database:
     
 
@@ -257,7 +287,7 @@ class Database:
         self.records = []
         self.loci = loci
         self.records_by_locus = {}
-        self.sets = []
+        self.concatenations = []
         self.alignments = {}
         self.trees = {}
         seen = []
@@ -273,12 +303,13 @@ class Database:
     def read_embl_genbank(self, input_filenames_list):
         generators = []
         for input_filename in input_filenames_list:
-            if is_embl_or_gb(input_filename):
-                generators.append(parse_input(input_filename))
-                print 'Accepted:', input_filename
-            else:
-                print ('Rejected: ' + input_filename + ' is ' + 
-                       guess_format(input_filename) + ' . Should be genbank or embl.')
+            generators.append(parse_input(input_filename, 'gb'))
+#            if is_embl_or_gb(input_filename):
+#                generators.append(parse_input(input_filename, 'gb'))
+#                print 'to do: correct parse_input'
+#                print 'Accepted:', input_filename
+#            else:
+#                print ('Rejected: ' + input_filename + ' should be genbank or embl and end with .gb or .embl')
             for generator in generators:
                 for record in generator:
                     dwindled_record = dwindle_record(record, self.loci)
@@ -287,46 +318,245 @@ class Database:
                     elif len(record.features) == 1 and not record.features[0].type == 'source':
                         self.records.append(dwindled_record)
 
-    def read_denovo(self, input_filename, feature_type, char_type, source_qualifiers = {}):
+#    def read_denovo(self, input_filename, feature_type, char_type, source_qualifiers = {}):
+#        count = 0
+#        # start the counter where it stoped the last time we read denovo things
+#        for record in self.record:
+#            if 'denovo' in record.id:
+#                serial = int(record.id[6:])
+#                if serial > count:
+#                    count = serial+1
+#        denovo = SeqIO.parse(input_filename, guess_format(input_filename))
+#        for record in denovo:
+#            feature = SeqFeature(FeatureLocation(0, len(record.seq)), type=feature_type, strand=1)
+#            source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
+#            if len(source_qualifiers.keys())>0:
+#                for key in source_qualifiers.keys():
+#                    source.qualifiers[key] = source_qualifiers[key]
+#            feature.qualifiers['original_id'] = [record.id]
+#            feature.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
+#            record.id = 'denovo'+str(count)
+#            count += 1
+#            feature.qualifiers['feature_id'] = [record.id+'_f0']
+#            source.qualifiers['feature_id'] = [record.id+'_source']
+#            record.features = [source, feature]
+#            if char_type == 'prot':
+#                record.seq.alphabet = IUPAC.protein
+#            elif char_type == 'dna':
+#                record.seq.alphabet = IUPAC.ambiguous_dna
+#            self.records.append(record)
+            
+    def read_denovo(self, input_filenames, char_type):
         count = 0
-        denovo = SeqIO.parse(input_filename, guess_format(input_filename))
-        for record in denovo:
-            feature = SeqFeature(FeatureLocation(0, len(record.seq)), type=feature_type, strand=1)
-            source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
-            if len(source_qualifiers.keys())>0:
-                for key in source_qualifiers.keys():
-                    source.qualifiers[key] = source_qualifiers[key]
-            feature.qualifiers['original_id'] = [record.id]
-            feature.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
-            record.id = 'denovo'+str(count)
-            count += 1
-            feature.qualifiers['feature_id'] = [record.id+'_f0']
-            source.qualifiers['feature_id'] = [record.id+'_source']
-            record.features = [source, feature]
-            if char_type == 'prot':
-                record.seq.alphabet = IUPAC.protein
-            elif char_type == 'dna':
-                record.seq.alphabet = IUPAC.ambiguous_dna
-            self.records.append(record)
-            
-    def add_set(self, set_object):
-        if isinstance(set_object, Set):
+        # start the counter where it stoped the last time we read denovo things
+        for record in self.records:
+            if 'denovo' in record.id:
+                serial = int(record.id[6:])
+                if serial > count:
+                    count = serial+1
+        for input_filename in input_filenames:
+            # Check input file format
+            suffix = re.search(r'\.([^\.]+)$',input_filename).group(1)
+            input_format = seq_format_from_suffix(suffix)
+            if input_format == 'embl' or input_format == 'genbank':
+                raise IOError('To read embl or genbank files use self.read_embl_genbank([filename0, filename1])')
+            denovo = SeqIO.parse(input_filename, input_format)
+            for record in denovo:
+                source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
+                source.qualifiers['original_id'] = [record.id]
+                source.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
+                record.id = 'denovo'+str(count)
+                source.qualifiers['feature_id'] = [record.id+'_source']
+                record.features = [source]
+                if char_type == 'prot':
+                    record.seq.alphabet = IUPAC.protein
+                elif char_type == 'dna':
+                    record.seq.alphabet = IUPAC.ambiguous_dna
+                count += 1
+                self.records.append(record)
+                
+    def add_feature_to_record(self, record_id, feature_type, location='full', qualifiers={}):
+        for record in self.records:
+            if record.id == record_id:
+                #determine new feature id
+                feature_id = None
+                serials = []
+                for feature in record.features:
+                    if 'feature_id' in feature.qualifiers.keys():
+                        if '_f' in feature.qualifiers['feature_id']:
+                            f = feature.qualifiers['feature_id']
+                            serials.append(int(f.split('_')[1][1:]))
+                serials.sort(reverse = True)
+                if len(serials) > 0:
+                    feature_id = record.id + '_f' + str(serials[0]+1)
+                else:
+                    feature_id = record.id + '_f0'
+                feature = None
+                if location == 'full':
+                    feature = SeqFeature(FeatureLocation(0, len(record.seq)),
+                                         type=feature_type,
+                                         strand=int(location[0][2]))
+                elif isinstance(location, list):
+                    for i in location:
+                        if not isinstance(i, list):
+                            raise RuntimeError('\'location\' takes either \'full\' or a list of lists')
+                    if len(location) == 1:
+                        feature = SeqFeature(FeatureLocation(int(location[0][0])-1,int(location[0][1])),
+                                             type=feature_type, strand=int(location[0][2]))
+                    elif len(location) > 1:
+                        list_of_locations = []
+                        for i in location:
+                            start = int(i[0]-1)
+                            end = int(i[1])
+                            strand = int(i[2])
+                            list_of_locations.append(FeatureLocation(start,end,strand=strand))
+                        feature = SeqFeature(CompoundLocation(list_of_locations),type=feature_type)
+                feature.qualifiers['feature_id'] = [feature_id]
+                if len(qualifiers.keys()) > 0:
+                    for key in qualifiers.keys():
+                        feature.qualifiers[key] = [qualifiers[key]]
+                if (('codon_start' in qualifiers.keys()) and
+                    ('transl_table' in qualifiers.keys())):
+                    cds = feature.extract(record.seq)
+                    if str(qualifiers['codon_start']) == '2':
+                        cds = cds[1:]
+                    elif str(qualifiers['codon_start']) == '3':
+                        cds = cds[2:]
+                    translation = cds.translate(table=int(qualifiers['transl_table']))
+                    if len(translation)*3 < float(0.9)*len(cds):
+                        raise RuntimeWarning('The translation of feature '+feature_id+' uses less than 90%'+
+                                             ' of the coding sequence')
+                    feature.qualifiers['translation'] = [str(translation)]
+                record.features.append(feature)
+                    
+                    
+    
+    
+    
+    
+    def add_concatenation(self, concatenation_object):
+        if isinstance(concatenation_object, Concatenation):
             seen = []
-            for s in self.sets:
+            for s in self.concatenations:
                 seen.append(s.name)
-            if set_object.name in seen:
-                raise NameError('Set ' + set_object.name + ' apears more than once in self.sets')
+            if concatenation_object.name in seen:
+                raise NameError('Concatenation ' + concatenation_object.name +
+                                ' apears more than once in self.concatenations')
             else:
-                self.sets.append(set_object)
+                self.concatenations.append(concatenation_object)
         else:
-            raise TypeError("Expecting Set object")
+            raise TypeError("Expecting Concatenation object")
 
-#    def make_set_alignments(self):
-#        for s in self.sets:
-#            meta = s.concat_meta
-#            meta_list = []
+    def make_concatenation_alignments(self):
+        for s in self.concatenations:
             
-
+            # get a non-redundant list of 'accross partitions' ids stored in 'meta', such as voucher specimen
+            
+            meta = s.otu_meta
+            meta_list = []
+            for record in self.records:
+                for feature in record.features:
+                    if not feature.type == 'source':
+                        qualifiers_dictionary = get_qualifiers_dictionary(self,
+                                                                          feature.qualifiers['feature_id'])
+                        if (meta in qualifiers_dictionary.keys() and
+                            not qualifiers_dictionary[meta] in meta_list):
+                            meta_list.append(qualifiers_dictionary[meta])
+                            
+            # make lists of available feature_ids in each locus
+            available_features = {}
+            for locus in s.loci:
+                available_features[locus.name] = []
+                for record in self.records_by_locus[locus.name]:
+                    available_features[locus.name].append(record.id)
+                    
+            # make a dict of individuals that fulfil the set's first rule
+            
+            seen_locus_names = []
+            
+            included_individuals = {}
+            for individual in meta_list:
+                include = True
+                for locus_name in s.concat_must_have_all_of:
+                    if not locus_name in seen_locus_names:
+                        seen_locus_names.append(locus_name)
+                    locus_specific_features = []
+                    for feature_id in available_features[locus_name]:
+                        qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
+                        if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
+                            locus_specific_features.append(feature_id)
+                    if len(locus_specific_features) == 1:
+                        if not individual in included_individuals.keys():
+                            included_individuals[individual] = {}
+                        included_individuals[individual][locus_name] = locus_specific_features[0]
+                    elif len(locus_specific_features) > 1:
+                        raise RuntimeError(individual + ' is not unique for ' + locus_name)
+                    else:
+                        include = False
+                if individual in included_individuals.keys() and not include:
+                    included_individuals.pop(individual, None)
+                    
+                       
+            # check if the individual fullfil the second set rule
+            
+            for individual in included_individuals.keys():
+                include = True
+                for loci_group in s.concat_must_have_one_of:
+                    count = 0
+                    for locus_name in loci_group:
+                        if not locus_name in seen_locus_names:
+                            seen_locus_names.append(locus_name)
+                        locus_specific_features = []
+                        for feature_id in available_features[locus_name]:
+                            qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
+                            if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
+                                locus_specific_features.append(feature_id)
+                        if len(locus_specific_features) == 1:
+                            count += 1
+                            included_individuals[individual][locus_name] = locus_specific_features[0]
+                        elif len(locus_specific_features) > 1:
+                            raise RuntimeError(individual + ' is not unique for ' + locus_name)
+                    if count == 0:
+                        include = False
+                if not include:
+                    included_individuals.pop(individual, None)
+                    
+            
+            # add loci that are in the set but not addressed in rules
+            
+            for individual in included_individuals.keys():
+                for locus in s.loci:
+                    if not locus.name in seen_locus_names:
+                        for feature_id in available_features[locus.name]:
+                            qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
+                            if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
+                                locus_specific_features.append(feature_id)
+                        if len(locus_specific_features) == 1:
+                            included_individuals[locus.name] = locus_specific_features[0]
+                        elif len(locus_specific_features) > 1:
+                            raise RuntimeError(individual + ' is not unique for ' + locus.name)
+                        
+            
+            # build alignment
+            
+            concat_records = []
+            alignment = []
+            for individual in included_individuals.keys():
+                sequence = ''
+                for locus in s.loci:
+                    length = len(self.alignments[locus.name][0])
+                    if locus.name in included_individuals[individual].keys():
+                        for record in self.alignments[locus.name]:
+                            if record.id == included_individuals[individual][locus.name]:
+                                sequence += str(record.seq)
+                    else:
+                        sequence += 'N'*length
+                concat_sequence = SeqRecord(seq = Seq(sequence), id = individual, description = '')
+                alignment.append(concat_sequence)
+            self.alignments[s.name] = MultipleSeqAlignment(alignment)                
+            s.feature_id_dict = included_individuals    
+            
+   
 
 
     def write(self, filename, format = 'genbank'):
@@ -378,7 +608,7 @@ class Database:
                         line_start.append(['null'])
                     for feature in record.features:
                         if not feature.type == 'source':
-                            line = line_start
+                            line = list(line_start)
                             for qual in feature_qualifiers:
                                 if qual in feature.qualifiers.keys() and qual == 'translation':
                                     trans = feature.qualifiers[qual][0]
@@ -391,6 +621,7 @@ class Database:
                                 else:
                                     line.append('null')
                             linewriter.writerow(line)
+
                             
 
                 
@@ -541,14 +772,50 @@ class Database:
         for key in self.records_by_locus.keys():
             SeqIO.write(self.records_by_locus[key], key+'.'+format, format)
             
-    def align(self):
-        self.write_by_locus(format = 'fasta')
-        for key in self.records_by_locus.keys():
-            infile_name = key+'.fasta'
-            mafft_cline = MafftCommandline(input=infile_name)
-            stdout, stderr = mafft_cline() 
-            align = AlignIO.read(StringIO(stdout), "fasta")
-            self.alignments[key] = align
+    def align(self, alignment_methods=[]):
+            seen_loci = []
+            for method in alignment_methods:
+                for locus in method.loci:
+                    if locus.name in seen_loci:
+                        raise RuntimeError('locus '+locus.name+' is in more than one AlignmentMethod objects')
+                    else:
+                        seen_loci.append(locus.name)
+                    stdout, stderr = method.command_lines[locus.name]()
+                    align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.protein)
+                    if method.CDSAlign and locus.feature_type == 'CDS':
+                        for seq in align:
+                            found = 0
+                            for s in method.CDS_in_frame[locus.name]:
+                                if s.id == seq.id:
+                                    found = 1
+                            if found == 0:
+                                raise RuntimeError(seq.id + ' is not in the CDS sequences')
+                        for s in method.CDS_in_frame[locus.name]:
+                            found = 0
+                            for seq in align:
+                                if s.id == seq.id:
+                                    found = 1
+                            if found == 0:
+                                raise RuntimeError(seq.id + ' is not in the protein sequences')
+                        for seq in method.CDS_in_frame[locus.name]:    
+                            for prot in align:
+                                if prot.id == seq.id:
+                                    i = 0
+                                    for p in str(prot.seq):
+                                        if not p == '-':
+                                            i += 1
+                                    if not i*3 == len(seq.seq):
+                                        raise RuntimeError('nuc and prot seqs have unmatched lengths for '+seq.id)
+                        aln_filename = locus.name+'.aln'
+                        AlignIO.write(align, aln_filename, 'fasta')
+                        cds_filename = 'CDS_in_frame_'+locus.name+'.fasta'
+                        stdout = os.popen('perl ./pal2nal.pl '+aln_filename+' '+cds_filename).read()
+                        align = AlignIO.read(StringIO(stdout), "clustal",  alphabet=IUPAC.ambiguous_dna)
+                        #from Bio import CodonAlign
+                        #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
+                        #align = codon_aln
+                    self.alignments[locus.name] = align
+
             
     def write_alns(self, format = 'fasta'):
         if len(self.alignments.keys()) == 0:
@@ -562,59 +829,127 @@ class Database:
             raise IOError('Align the records first')
         else:
             self.write_alns(format = 'fasta')
-            for key in self.alignments:
-                char_type = ''
-                mode = ''
-                for locus in self.loci:
-                    if locus.name == key:
-                        char_type = locus.char_type
-                if char_type == 'dna':
-                    mod = 'GTRGAMMA'
-                elif char_type == 'prot':
-                    mod = 'PROTGAMMAJTT'
-                alignment = self.alignments[key]
-                raxml_cline = RaxmlCommandline(sequences=key+'_aln.fasta', algorithm='a',
-                                               num_replicates=4, parsimony_seed=42,
-                                               threads=3,rapid_bootstrap_seed=452,
-                                               name=key, model=mod)
-                raxml_cline()
-                t = Tree('RAxML_bipartitions.'+key)
-                t.name = key
-                t.dist = 0
-                for leaf in t:
-                    records = self.records
-                    feature = ''
-                    feature_source = ''
-                    record = ''
-                    for r in records:
-                        if r.id in leaf.name:
-                            record = r
-                            for f in r.features:
-                                if f.type == 'source':
-                                    feature_source = f
-                                elif f.qualifiers['feature_id'][0] == leaf.name:
-                                    feature = f
-                    for a in record.annotations.keys():
-                        label = 'annotation_'+a
-                        leaf.add_feature(label, record.annotations[a])
-                    for f_source_qual in feature_source.qualifiers.keys():
-                        label = 'source_'+f_source_qual
-                        leaf.add_feature(label, feature_source.qualifiers[f_source_qual][0])
-                    for f_qual in feature.qualifiers.keys():
-                        leaf.add_feature(f_qual, feature.qualifiers[f_qual][0])
+            loci_names = []
+            for locus in self.loci:
+                loci_names.append(locus.name)
+            set_names = []
+            for s in self.concatenations:
+                set_names.append(s.name)
+            for key in self.alignments: 
+                print 'reconstructing '+key
+                if key in loci_names:
+                    char_type = ''
+                    mod = ''
+                    for locus in self.loci:
+                        if locus.name == key:
+                            char_type = locus.char_type
+                    if char_type == 'dna':
+                        mod = 'GTRGAMMA'
+                    elif char_type == 'prot':
+                        mod = 'PROTGAMMAJTT'
+                    alignment = self.alignments[key]
+                    raxml_cline = RaxmlCommandline(sequences=key+'_aln.fasta', algorithm='a',
+                                                   num_replicates=4, parsimony_seed=42,
+                                                   threads=3,rapid_bootstrap_seed=452,
+                                                   name=key, model=mod)
+                    raxml_cline()
+                    t = Tree('RAxML_bipartitions.'+key)
+                    t.name = key
+                    t.dist = 0
+                    for leaf in t:
+                        records = self.records
+                        feature = ''
+                        feature_source = ''
+                        record = ''
+                        for r in records:
+                            if r.id in leaf.name:
+                                record = r
+                                for f in r.features:
+                                    if f.type == 'source':
+                                        feature_source = f
+                                    elif f.qualifiers['feature_id'][0] == leaf.name:
+                                        feature = f
+                        for a in record.annotations.keys():
+                            label = 'annotation_'+a
+                            leaf.add_feature(label, record.annotations[a])
+                        for f_source_qual in feature_source.qualifiers.keys():
+                            label = 'source_'+f_source_qual
+                            leaf.add_feature(label, feature_source.qualifiers[f_source_qual][0])
+                        for f_qual in feature.qualifiers.keys():
+                            leaf.add_feature(f_qual, feature.qualifiers[f_qual][0])
                     
                                         
                             
                     
-                self.trees[key] = t
+                    self.trees[key] = [t,t.write(features=[])]
+                    
+                elif key in set_names:
+                    s = None
+                    for i in self.concatenations:
+                        if i.name == key:
+                            s = i
+                    model = []
+                    mod = ''
+                    for locus in s.loci:
+                        m = 'DNA'
+                        if locus.char_type == 'prot':
+                            m = 'JTT'
+                        length = len(self.alignments[locus.name][0])
+                        model.append([m,locus.name,length])
+                    
+                    mod = 'GTRGAMMA'
+                    if model[0][0] == 'JTT':
+                        mod = 'PROTGAMMAJTT'
+                    
+                    # make partition file
+                    
+                    partfile = open('partfile','wt')
+                    i = 1
+                    for m in model:
+                        partfile.write(m[0]+', '+m[1]+'='+str(i)+'-'+str(m[2]+i-1)+'\n')
+                        i += m[2]
+                    partfile.close()
+                    alignment = self.alignments[key]
+                    raxml_cline = RaxmlCommandline(sequences=key+'_aln.fasta', algorithm='a',
+                                                   num_replicates=4, parsimony_seed=42,
+                                                   threads=3,rapid_bootstrap_seed=452,
+                                                   name=key, model=mod, partition_filename='partfile')
+                    raxml_cline()
+                    os.remove('partfile')
+                    
+                    t = Tree('RAxML_bipartitions.'+key)
+                    t.name = key
+                    t.dist = 0
+                    for leaf in t:
+                        records = self.records
+                        feature = ''
+                        feature_source = ''
+                        record = ''
+                        for r in records:
+                            for feature in r.features:
+                                if not feature.type == 'source':
+                                    qual_dict = get_qualifiers_dictionary(self, feature.qualifiers['feature_id'])
+                                    if s.otu_meta in qual_dict.keys() and qual_dict[s.otu_meta] == leaf.name:
+                                        for key in qual_dict.keys():
+                                            leaf.add_feature(key, qual_dict[key])
+                    self.trees[s.name] = [t,t.write(features=[])]
                 for file_name in os.listdir(os.curdir):
                     if 'RAxML_' in file_name:
                         os.remove(file_name)
 
+    def clear_tree_annotations(self):
+        for tree in self.trees.keys():
+            t = Tree(self.trees[tree][1])
+            t.dist = 0
+            self.trees[tree][0] = t
 
     def write_nexml(self, output_name):
         D = dendropy.DataSet()
         tree_list = []
+        
+        loci_names = []
+        for locus in self.loci:
+            loci_names.append(locus.name)
         
         for tree_name in self.trees.keys():
             tree_string = self.trees[tree_name].write(features=[])
@@ -625,18 +960,19 @@ class Database:
         D.add_tree_list(TL)
         
         for aln_name in self.alignments.keys():
-            char_type = ''
-            matrix = None
-            for locus in self.loci:
-                if locus.name == aln_name:
-                    char_type = locus.char_type
-            if char_type == 'dna':
-                matrix = dendropy.DnaCharacterMatrix()
-            elif char_type == 'prot':
-                matrix = dendropy.ProteinCharacterMatrix()
-            matrix_string = self.alignments[aln_name].format('fasta')
-            matrix.read_from_string(matrix_string,'fasta')
-            D.add_char_matrix(matrix)
+            if aln_name in loci_names:
+                char_type = ''
+                matrix = None
+                for locus in self.loci:
+                    if locus.name == aln_name:
+                        char_type = locus.char_type
+                if char_type == 'dna':
+                    matrix = dendropy.DnaCharacterMatrix()
+                elif char_type == 'prot':
+                    matrix = dendropy.ProteinCharacterMatrix()
+                matrix_string = self.alignments[aln_name].format('fasta')
+                matrix.read_from_string(matrix_string,'fasta')
+                D.add_char_matrix(matrix)
             
         D.write_to_path(
             output_name,
@@ -663,12 +999,21 @@ class Database:
     
             ts = TreeStyle()
             ts.show_leaf_name = False
+            ts.legend_position=1
+            ts.legend.add_face(TextFace('Node support: ', fsize=20), column=0)
+            i = 1
+            for color in node_support_dict.keys():
+                ts.legend.add_face(CircleFace(radius = 8, color = color), column=i)
+                i +=1 
+                ts.legend.add_face(TextFace(' '+str(node_support_dict[color][0])+'-'+str(node_support_dict[color][1]),
+                                            fsize=20), column=i)
+                i += 1
             for tree in self.trees.keys():
     
                 # set outgroup leaves, labels and label colors
                 outgroup_list = []
-                for leaf in self.trees[tree]:
-                    qualifiers_dictionary = get_qualifiers_dictionary(self, leaf.name)
+                for leaf in self.trees[tree][0]:
+                    qualifiers_dictionary = get_qualifiers_dictionary(self, leaf.feature_id)
                     leaf_label = ''
                     for meta in leaf_labels_txt_meta:
                         leaf_label += qualifiers_dictionary[meta]+' '
@@ -683,45 +1028,150 @@ class Database:
                         outgroup_list.append(leaf)
                 #set outgroup
                 if len(outgroup_list) == 1:
-                    self.trees[tree].set_outgroup(outgroup_list[0])
+                    try:
+                        self.trees[tree][0].set_outgroup(outgroup_list[0])
+                    except:
+                        print 'root in '+tree+' already set correctly?'
                 elif len(outgroup_list) > 1:
-                    R = self.trees[tree].get_common_ancestor(outgroup_list)
-                    self.trees[tree].set_outgroup(R)
+                    try:
+                        R = self.trees[tree][0].get_common_ancestor(outgroup_list)
+                        self.trees[tree][0].set_outgroup(R)
+                    except:
+                        print 'root in '+tree+' already set correctly?'
                 elif len(outgroup_list)==0:
-                    R = self.trees[tree].get_midpoint_outgroup()
-                    self.trees[tree].set_outgroup(R)
+                    try:
+                        R = self.trees[tree][0].get_midpoint_outgroup()
+                        self.trees[tree][0].set_outgroup(R)
+                    except:
+                        print 'root in '+tree+' already set correctly?'
     
                 # ladderize
-                self.trees[tree].ladderize()
+                self.trees[tree][0].ladderize()
     
                 # node bg colors
                 for key in node_bg_color.keys():
-                    for node in self.trees[tree].get_monophyletic(values=[key], target_attr=node_bg_meta):
+                    for node in self.trees[tree][0].get_monophyletic(values=[key], target_attr=node_bg_meta):
                         ns = NodeStyle(bgcolor=node_bg_color[key])
                         node.set_style(ns)
     
                 # node support
     
-                for node in self.trees[tree].traverse():
+                for node in self.trees[tree][0].traverse():
                     for key in node_support_dict.keys():
                         if (node.support <= node_support_dict[key][0] and
                             node.support > node_support_dict[key][1]):
                             node.add_face(CircleFace(radius = 5, color = key),column=0, position = "float")
-                ts.legend_position=1
-                ts.legend.add_face(TextFace('Node support: ', fsize=20), column=0)
-                i = 1
-                for color in node_support_dict.keys():
-                    ts.legend.add_face(CircleFace(radius = 8, color = color), column=i)
-                    i +=1 
-                    ts.legend.add_face(TextFace(' '+str(node_support_dict[color][0])+'-'+str(node_support_dict[color][1]),
-                                                fsize=20), column=i)
-                    i += 1
+
                     
-                self.trees[tree].render(tree+'.png',w=1000, tree_style=ts)
+                self.trees[tree][0].render(tree+'.png',w=1000, tree_style=ts)
+
+
+class AlignmentMethod:
+    
+    def __init__(self, db, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
+                 cmd='mafft', loci='all',
+                 cline_args=dict(localpair=True, maxiterate=1000)):
+        self.method_name=method_name
+        self.CDSAlign=CDSAlign
+        self.program_name=program_name
+        self.loci = db.loci
+        if not loci == 'all':
+            self.loci = []
+            for locus_name in loci:
+                for locus in db.loci:
+                    if locus_name == locus.name:
+                        self.loci.append(locus)
+        self.CDS_proteins = {}
+        self.CDS_in_frame = {}
+        self.aln_input_strings = {}
+        self.command_lines = {}
+        # make defalut input files
+        db.write_by_locus()
+        for locus in self.loci:
+            # put default input file filename and string in the AlignmentMethod object
+            input_filename=locus.name+'.fasta'
+            self.aln_input_strings[locus.name] = [open(input_filename,'r').read()]
+            # If CDS prepare reference protein input file and in frame CDS input file
+            if locus.feature_type == 'CDS' and locus.char_type == 'dna' and self.CDSAlign: 
+                self.CDS_proteins[locus.name] = []
+                self.CDS_in_frame[locus.name] = []
+                for record in db.records:
+                    for feature in record.features:
+                        if (not feature.type == 'source' and 'gene' in feature.qualifiers.keys() and
+                            feature.qualifiers['gene'][0] in locus.aliases):
+                            S = feature.extract(record.seq)
+                            # Make in-frame CDS input file seq start in frame
+                            if 'codon_start' in feature.qualifiers.keys():
+                                i = feature.qualifiers['codon_start'][0]
+                                if i > 1:
+                                    S = S[(int(i)-1):]
+                            # Make in-frame CDS input file seq end in frame
+                            if len(S)%3 == 1:
+                                S = S[:-1]
+                            elif len(S)%3 == 2:
+                                S = S[:-2]  
+                            # make protein input file seq
+                            P = Seq(feature.qualifiers['translation'][0], IUPAC.protein)
+                            # Remove 3' positions that are based on partial codons
+                            while len(P)*3 > len(S):
+                                P = P[:-1]
+                            # remove complete termination codon
+                            if (len(S)/3)-1 == len(P):
+                                S = S[:-3]
+                            # make in frame cds record
+                            feature_record = SeqRecord(seq = S, id = feature.qualifiers['feature_id'][0],
+                                                               description = '')
+                            # put it in the object
+                            self.CDS_in_frame[locus.name].append(feature_record)
+                            # make protein record
+                            feature_record = SeqRecord(seq = P, id = feature.qualifiers['feature_id'][0],
+                                                       description = '')
+                            # Put the protein records in the AlignmentMethod object
+                            self.CDS_proteins[locus.name].append(feature_record)
+                           
+                                    
+                # check same number of prot and cds objects                    
+                if len(db.records_by_locus[locus.name]) > len(self.CDS_proteins[locus.name]):
+                    raise RuntimeError('For the CDS locus '+locus.name+': more nuc seqs than prot seqs.'+
+                                       ' You may miss a \'translate\' or \'gene\' qualifier in some of '+
+                                       'the features.')
+                elif len(db.records_by_locus[locus.name]) < len(self.CDS_proteins[locus.name]):
+                    raise RuntimeError('For the CDS locus '+locus.name+': less nuc seqs than prot seqs.'+
+                                       ' You may miss a \'translate\' or \'gene\' qualifier in some of '+
+                                       'the features.')
+                unmatched = []
+                for record in self.CDS_in_frame[locus.name]:
+                    for prot in self.CDS_proteins[locus.name]:
+                        if prot.id == record.id:
+                            if not len(prot.seq)*3 == len(record.seq):
+                                unmatched.append(record.id)
+                unmatched_string = ''
+                if len(unmatched) > 0:
+                    for u in unmatched:
+                        unmatched_string += u+' '
+                    raise RuntimeError('The following CDS/protein pairs are unmatched: '+unmatched_string)
+                    
+                SeqIO.write(self.CDS_in_frame[locus.name], 'CDS_in_frame_'+locus.name+'.fasta', 'fasta')
+                input_filename2='CDS_in_frame_'+locus.name+'.fasta'
+                SeqIO.write(self.CDS_proteins[locus.name], 'CDS_proteins_'+locus.name+'.fasta', 'fasta')
+                input_filename='CDS_proteins_'+locus.name+'.fasta'
+                self.aln_input_strings[locus.name][0] = [open(input_filename,'r').read(),
+                                                         open(input_filename2,'r').read()]
+            cline = dict(dict(input=input_filename), **cline_args)
+            if self.program_name == 'mafft':
+                self.command_lines[locus.name] = MafftCommandline(cmd=cmd)
+            elif self.program_name == 'muscle':
+                self.command_lines[locus.name] = MuscleCommandline(cmd=cmd)
+            for c in cline.keys():
+                self.command_lines[locus.name].__setattr__(c,cline[c])
+            print str(self.command_lines[locus.name])
 
 
 
 if __name__ == "__main__":
     import doctest
     doctest.testmod()   
-          
+
+
+    
+    
