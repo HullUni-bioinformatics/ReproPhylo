@@ -1,6 +1,6 @@
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random
+import os, csv, sys, dendropy, re, time, random, glob
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
@@ -289,6 +289,7 @@ class Database:
         self.records_by_locus = {}
         self.concatenations = []
         self.alignments = {}
+        self.masked_alignments = {}
         self.trees = {}
         seen = []
         for locus in loci:
@@ -356,11 +357,12 @@ class Database:
                     count = serial+1
         for input_filename in input_filenames:
             # Check input file format
-            suffix = re.search(r'\.([^\.]+)$',input_filename).group(1)
-            input_format = seq_format_from_suffix(suffix)
-            if input_format == 'embl' or input_format == 'genbank':
-                raise IOError('To read embl or genbank files use self.read_embl_genbank([filename0, filename1])')
-            denovo = SeqIO.parse(input_filename, input_format)
+            #suffix = re.search(r'\.([^\.]+)$',input_filename).groups()[1]
+            #input_format = seq_format_from_suffix(suffix)
+            #if input_format == 'embl' or input_format == 'genbank':
+            #    raise IOError('To read embl or genbank files use self.read_embl_genbank([filename0, filename1])')
+            #denovo = SeqIO.parse(input_filename, input_format)
+            denovo = SeqIO.parse(input_filename, 'fasta')
             for record in denovo:
                 source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
                 source.qualifiers['original_id'] = [record.id]
@@ -395,7 +397,7 @@ class Database:
                 if location == 'full':
                     feature = SeqFeature(FeatureLocation(0, len(record.seq)),
                                          type=feature_type,
-                                         strand=int(location[0][2]))
+                                         strand=1)
                 elif isinstance(location, list):
                     for i in location:
                         if not isinstance(i, list):
@@ -772,7 +774,7 @@ class Database:
         for key in self.records_by_locus.keys():
             SeqIO.write(self.records_by_locus[key], key+'.'+format, format)
             
-    def align(self, alignment_methods=[]):
+    def align(self, alignment_methods=[], pal2nal='./pal2nal.pl'):
             seen_loci = []
             for method in alignment_methods:
                 for locus in method.loci:
@@ -806,15 +808,18 @@ class Database:
                                             i += 1
                                     if not i*3 == len(seq.seq):
                                         raise RuntimeError('nuc and prot seqs have unmatched lengths for '+seq.id)
-                        aln_filename = locus.name+'.aln'
+                        aln_filename = method.id+'_'+locus.name+'.aln'
                         AlignIO.write(align, aln_filename, 'fasta')
-                        cds_filename = 'CDS_in_frame_'+locus.name+'.fasta'
-                        stdout = os.popen('perl ./pal2nal.pl '+aln_filename+' '+cds_filename).read()
+                        cds_filename = method.id+'_CDS_in_frame_'+locus.name+'.fasta'
+                        stdout = os.popen('perl '+pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr').read()
                         align = AlignIO.read(StringIO(stdout), "clustal",  alphabet=IUPAC.ambiguous_dna)
                         #from Bio import CodonAlign
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
                         #align = codon_aln
+                    method_files = glob.glob(method.id+'_*')
                     self.alignments[locus.name] = align
+                for f in method_files:
+                    os.remove(f)
 
             
     def write_alns(self, format = 'fasta'):
@@ -823,19 +828,26 @@ class Database:
         else:
             for key in self.alignments:
                 AlignIO.write(self.alignments[key], key+'_aln.'+format, format)
+                
+    def write_masked_alns(self, format = 'fasta'):
+        if len(self.masked_alignments.keys()) == 0:
+            raise IOError('Align and mask the records first')
+        else:
+            for key in self.masked_alignments.keys():
+                AlignIO.write(self.masked_alignments[key], key+'_masked_aln.'+format, format)
             
     def tree(self):
-        if len(self.alignments.keys()) == 0:
+        if len(self.masked_alignments.keys()) == 0:
             raise IOError('Align the records first')
         else:
-            self.write_alns(format = 'fasta')
+            self.write_masked_alns(format = 'fasta')
             loci_names = []
             for locus in self.loci:
                 loci_names.append(locus.name)
             set_names = []
             for s in self.concatenations:
                 set_names.append(s.name)
-            for key in self.alignments: 
+            for key in self.masked_alignments.keys(): 
                 print 'reconstructing '+key
                 if key in loci_names:
                     char_type = ''
@@ -848,8 +860,8 @@ class Database:
                     elif char_type == 'prot':
                         mod = 'PROTGAMMAJTT'
                     alignment = self.alignments[key]
-                    raxml_cline = RaxmlCommandline(sequences=key+'_aln.fasta', algorithm='a',
-                                                   num_replicates=4, parsimony_seed=42,
+                    raxml_cline = RaxmlCommandline(sequences=key+'_masked_aln.fasta', algorithm='a',
+                                                   num_replicates=100, parsimony_seed=42,
                                                    threads=3,rapid_bootstrap_seed=452,
                                                    name=key, model=mod)
                     raxml_cline()
@@ -910,8 +922,8 @@ class Database:
                         i += m[2]
                     partfile.close()
                     alignment = self.alignments[key]
-                    raxml_cline = RaxmlCommandline(sequences=key+'_aln.fasta', algorithm='a',
-                                                   num_replicates=4, parsimony_seed=42,
+                    raxml_cline = RaxmlCommandline(sequences=key+'_masked_aln.fasta', algorithm='a',
+                                                   num_replicates=100, parsimony_seed=42,
                                                    threads=3,rapid_bootstrap_seed=452,
                                                    name=key, model=mod, partition_filename='partfile')
                     raxml_cline()
@@ -1065,12 +1077,22 @@ class Database:
                     
                 self.trees[tree][0].render(tree+'.png',w=1000, tree_style=ts)
 
-
+    
+    def mask(self):
+        for aln in self.alignments.keys():
+            AlignIO.write(self.alignments[aln],aln+'_masked_aln.fasta','fasta')
+            stdout = os.popen('trimal -in '+ aln +'_masked_aln.fasta -gappyout').read()
+            align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.ambiguous_dna)
+            for record in align:
+                record.description = ''
+            self.masked_alignments[aln] = align
+            
 class AlignmentMethod:
     
     def __init__(self, db, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
                  cmd='mafft', loci='all',
                  cline_args=dict(localpair=True, maxiterate=1000)):
+        self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.CDSAlign=CDSAlign
         self.program_name=program_name
@@ -1086,10 +1108,13 @@ class AlignmentMethod:
         self.aln_input_strings = {}
         self.command_lines = {}
         # make defalut input files
-        db.write_by_locus()
+        if db.records_by_locus == {}:
+            db.extract_by_locus()
+        for key in db.records_by_locus.keys():
+            SeqIO.write(db.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
         for locus in self.loci:
             # put default input file filename and string in the AlignmentMethod object
-            input_filename=locus.name+'.fasta'
+            input_filename=self.id+'_'+locus.name+'.fasta'
             self.aln_input_strings[locus.name] = [open(input_filename,'r').read()]
             # If CDS prepare reference protein input file and in frame CDS input file
             if locus.feature_type == 'CDS' and locus.char_type == 'dna' and self.CDSAlign: 
@@ -1151,10 +1176,12 @@ class AlignmentMethod:
                         unmatched_string += u+' '
                     raise RuntimeError('The following CDS/protein pairs are unmatched: '+unmatched_string)
                     
-                SeqIO.write(self.CDS_in_frame[locus.name], 'CDS_in_frame_'+locus.name+'.fasta', 'fasta')
-                input_filename2='CDS_in_frame_'+locus.name+'.fasta'
-                SeqIO.write(self.CDS_proteins[locus.name], 'CDS_proteins_'+locus.name+'.fasta', 'fasta')
-                input_filename='CDS_proteins_'+locus.name+'.fasta'
+                SeqIO.write(self.CDS_in_frame[locus.name],
+                            self.id+'_CDS_in_frame_'+locus.name+'.fasta', 'fasta')
+                input_filename2=self.id+'_CDS_in_frame_'+locus.name+'.fasta'
+                SeqIO.write(self.CDS_proteins[locus.name],
+                            self.id+'_CDS_proteins_'+locus.name+'.fasta', 'fasta')
+                input_filename=self.id+'_CDS_proteins_'+locus.name+'.fasta'
                 self.aln_input_strings[locus.name][0] = [open(input_filename,'r').read(),
                                                          open(input_filename2,'r').read()]
             cline = dict(dict(input=input_filename), **cline_args)
