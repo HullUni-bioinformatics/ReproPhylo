@@ -1,0 +1,50 @@
+dna,CDS,ald,ald
+prot,CDS,alg11,alg11
+dna,CDS,atp_synthase_beta_subunit,atp synthase beta subunit
+dna,CDS,atp6,atp6
+dna,CDS,atp8,atp8
+dna,CDS,atp9,atp9
+dna,CDS,catalase,catalase
+dna,CDS,cchga,cchga
+dna,CDS,cchgb,cchgb
+dna,CDS,cchgc,cchgc
+dna,CDS,cchgd,cchgd
+dna,CDS,cchge,cchge
+dna,CDS,cchgf,cchgf
+dna,CDS,cob,cob
+dna,CDS,coi,coi,1
+dna,CDS,cox1,cox1,1
+dna,CDS,cox2,cox2
+dna,CDS,cox3,cox3
+dna,CDS,coxi,coxi,1
+dna,CDS,cytb,cytb
+dna,CDS,elongation_factor_1_alpha,elongation factor 1 alpha
+dna,CDS,hsp70,hsp70
+dna,CDS,mat,mat
+dna,CDS,nad1,nad1,2
+dna,CDS,nad2,nad2,3
+dna,CDS,nad3,nad3,4
+dna,CDS,nad4,nad4,5
+dna,CDS,nad4l,nad4l,6
+dna,CDS,nad5,nad5,7
+dna,CDS,nad6,nad6,8
+dna,CDS,nd1,nd1,2
+dna,CDS,nd2,nd2,3
+dna,CDS,nd3,nd3,4
+dna,CDS,nd4,nd4,5
+dna,CDS,nd4l,nd4l,6
+dna,CDS,nd5,nd5,7
+dna,CDS,nd6,nd6,8
+dna,CDS,putative_laglidadg_protein,putative laglidadg protein
+dna,CDS,tpi,tpi
+dna,rRNA,18s_ribosomal_rna,18s ribosomal rna,9
+dna,rRNA,18s_rrna,18s rrna,9
+dna,rRNA,28s_large_subunit_ribosomal_rna,28s large subunit ribosomal rna,10
+dna,rRNA,28s_ribosomal_rna,28s ribosomal rna,10
+dna,rRNA,5.8s_ribosomal_rna,5.8s ribosomal rna,11
+dna,rRNA,5.8s_rrna,5.8s rrna,11
+dna,rRNA,5s_rrna,5s rrna
+dna,rRNA,rnl,rnl,10
+dna,rRNA,rns,rns,9
+dna,rRNA,rrnl,rrnl,10
+dna,rRNA,small_subunit_18s_ribosomal_rna,small subunit 18s ribosomal rna,9
