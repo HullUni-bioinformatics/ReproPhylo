@@ -1,4 +1,5 @@
 
+
 from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform
 from Bio.Seq import Seq
@@ -1051,7 +1052,7 @@ class Database:
                                 fgcolor = leaf_label_colors[colour_name]
                     leaf_face = TextFace(leaf_label, fgcolor=fgcolor)
                     leaf.add_face(leaf_face,0)
-                    if root_value in qualifiers_dictionary[root_meta]:
+                    if not root_value == 'mid' and root_value in qualifiers_dictionary[root_meta]:
                         outgroup_list.append(leaf)
                         
                     if heat_map_meta:
