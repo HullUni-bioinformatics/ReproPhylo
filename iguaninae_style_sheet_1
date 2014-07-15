@@ -1,0 +1,29 @@
+
+# outgroup
+# usage: outgroup,qualifier, value
+outgroup,mid,mid
+
+# label_text
+# usage:
+# label_text,text_qualifiers
+label_text,source_organism
+
+# label_colour (optional)
+# usage:
+# label_colour,qualifier,value1,colour1,...,valuen,colourn
+
+# clade_bg (optional)
+# usage:
+# clade_bg,qualifier,value1,colour1,...,valuen,colourn
+#clade_bg,genus,Astrophorid,white,Cinachyrella,green,Paratetilla,yellowgreen,Amphitethya,olivedrab,Tetilla,skyblue,Cinachyra,firebrick,Acanthotetilla,silver,Fangophilina,crimson,Craniella,red
+
+# support
+# usage: support,colour1,start end1,colour2,start end2,...,colourn,start endn
+support,black,100 99, dimgray,99 75,silver,75 50
+
+# multifrucation
+# usage:multifrucation,value
+#multifrucation,50
+
+# heat map
+# usage: heatmap,colour_scheme,qualifier1,qualifier2,...,qualifiern 
