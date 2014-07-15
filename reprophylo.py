@@ -1081,7 +1081,15 @@ class Database:
                         
                         
                 #set outgroup
-                if len(outgroup_list) == 1:
+                if outgroup_list == ['mid']:
+                    try:
+                        R = self.trees[tree][0].get_midpoint_outgroup()
+                        self.trees[tree][0].set_outgroup(R)
+                        print 'rooting tree '+tree+' at midpoint'
+                    except:
+                        print 'root in '+tree+' already set correctly?'
+                    
+                elif len(outgroup_list) == 1:
                     try:
                         self.trees[tree][0].set_outgroup(outgroup_list[0])
                     except:

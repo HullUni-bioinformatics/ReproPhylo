@@ -1,0 +1,9 @@
+dna,rRNA,18S_ribosomal_RNA,18S ribosomal RNA,rrnS,s-rRNA,small subunit ribosomal RNA
+dna,CDS,ATP8,ATP8,atp8
+dna,rRNA,12S_ribosomal_RNA,12S ribosomal RNA,12S rRNA
+dna,rRNA,28S_large_subunit_ribosomal_RNA,28S large subunit ribosomal RNA,28S ribosomal RNA,28S rRNA,l-rRNA,rrnL
+dna,CDS,ATP6,ATP6,atp6
+dna,rRNA,16S_ribosomal_RNA,16S ribosomal RNA,16S rRNA
+dna,CDS,coi,coi,COI,COX1,cox1,cytochrome c oxidase subunit I
+dna,CDS,nad1,nad1,ND1
+dna,CDS,elongation_factor_1-alpha,elongation factor 1-alpha,elongation factor-1 alpha

@@ -26,7 +26,7 @@ def make_loci_control_file_from_genbank(genbank_filename, control_filename):
    
             # If it contains some attribute called 'gene' save that
             if 'gene' in feature.qualifiers:
-               geneName = feature.qualifiers['gene'][0].lower()
+               geneName = feature.qualifiers['gene'][0]
                geneName.replace(',',';')
                if feature.type+','+geneName in gene_dict:
                    gene_dict[feature.type+','+geneName]+=1
@@ -36,7 +36,7 @@ def make_loci_control_file_from_genbank(genbank_filename, control_filename):
                
             # Else if it contains some attribute called 'product' save that instead
             elif 'product' in feature.qualifiers:
-               geneName = feature.qualifiers['product'][0].lower()
+               geneName = feature.qualifiers['product'][0]
                geneName.replace(',',';')
                if feature.type+','+geneName in gene_dict:
                    gene_dict[feature.type+','+geneName]+=1
