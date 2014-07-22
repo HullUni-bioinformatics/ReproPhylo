@@ -1,5 +1,4 @@
 
-
 from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform
 from Bio.Seq import Seq
@@ -12,8 +11,8 @@ from Bio import AlignIO
 from Bio.Phylo.Applications import RaxmlCommandline
 from Bio.Align import MultipleSeqAlignment
 from Bio.SeqUtils import GC
-from cogent import LoadSeqs, LoadTree
-from cogent.app.raxml_v730 import build_tree_from_alignment
+#from cogent import LoadSeqs, LoadTree
+#from cogent.app.raxml_v730 import build_tree_from_alignment
 from ete2 import *
 
 class Locus:
@@ -99,13 +98,22 @@ class Concatenation:
 
 
 def platform_report():
-    return ['Platform: '+platform.platform(aliased=0, terse=0),
+    import pkg_resources
+    modules = []
+    for i in ('ete2','biopython','dendropy'):
+        modules.append(i+' version: '+
+                            pkg_resources.get_distribution(i).version)
+    return(['Platform: '+platform.platform(aliased=0, terse=0),
             'Processor: '+platform.processor(),
             'Python build: '+platform.python_build()[0] + platform.python_build()[1],
             'Python compiler: '+platform.python_compiler(),
             'Python implementation: ' +platform.python_implementation(),
-            'Python version: ' + platform.python_version(),
-            'User: ' +platform.uname()[1]]
+            'Python version: ' + platform.python_version()]+
+             modules+
+            ['User: ' +platform.uname()[1]])
+
+
+
 
 
 
@@ -458,11 +466,7 @@ class Database:
                                              ' of the coding sequence')
                     feature.qualifiers['translation'] = [str(translation)]
                 record.features.append(feature)
-                    
-                    
-    
-    
-    
+
     
     def add_concatenation(self, concatenation_object):
         if isinstance(concatenation_object, Concatenation):
@@ -959,27 +963,51 @@ class Database:
             loci_names.append(locus.name)
         
         for tree_name in self.trees.keys():
-            tree_string = self.trees[tree_name].write(features=[])
+            #get aligned and trimmd aligned sequences as leaf features
+            t = self.trees[tree_name][0]
+            for l in t:
+                aln_name = l.tree_method_id.split('_')[1]
+                
+                otu_feature = 'feature_id'
+                if aln_name in [c.name for c in self.concatenations]:
+                    for c in self.concatenations:
+                        if c.name == aln_name:
+                            otu_feature = c.otu_meta
+                            
+                if not aln_name in [c.name for c in self.concatenations]:
+                    leaf_feature_value = getattr(l, otu_feature)
+                    alignment = self.alignments[aln_name]
+                    for record in alignment:
+                        if record.id == leaf_feature_value:
+                            l.add_feature('aligned_sequence',str(record.seq))
+                    t_aln = db.trimmed_alignments[aln_name]
+                    
+                leaf_feature_value = getattr(l, otu_feature)
+                for record in t_aln:
+                    if record.id == leaf_feature_value:
+                        l.add_feature('aligned_trimmed_sequence',str(record.seq))
+                    
+            tree_string = self.trees[tree_name][0].write(features=[])
             tree = dendropy.Tree()
             tree.read_from_string(tree_string, schema='newick', extract_comment_metadata = True)
             tree_list.append(tree)
         TL = dendropy.TreeList(tree_list)    
         D.add_tree_list(TL)
         
-        for aln_name in self.alignments.keys():
-            if aln_name in loci_names:
-                char_type = ''
-                matrix = None
-                for locus in self.loci:
-                    if locus.name == aln_name:
-                        char_type = locus.char_type
-                if char_type == 'dna':
-                    matrix = dendropy.DnaCharacterMatrix()
-                elif char_type == 'prot':
-                    matrix = dendropy.ProteinCharacterMatrix()
-                matrix_string = self.alignments[aln_name].format('fasta')
-                matrix.read_from_string(matrix_string,'fasta')
-                D.add_char_matrix(matrix)
+        #for aln_name in self.alignments.keys():
+        #    if aln_name in loci_names:
+        #        char_type = ''
+        #        matrix = None
+        #        for locus in self.loci:
+        #            if locus.name == aln_name:
+        #                char_type = locus.char_type
+        #        if char_type == 'dna':
+        #            matrix = dendropy.DnaCharacterMatrix()
+        #        elif char_type == 'prot':
+        #            matrix = dendropy.ProteinCharacterMatrix()
+        #        matrix_string = self.alignments[aln_name].format('fasta')
+        #        matrix.read_from_string(matrix_string,'fasta')
+        #        D.add_char_matrix(matrix)
             
         D.write_to_path(
             output_name,
@@ -1005,7 +1033,9 @@ class Database:
                  node_support_dict=None,
                  
                  heat_map_meta = None, #list
-                 heat_map_colour_scheme=2
+                 heat_map_colour_scheme=2,
+                 
+                 multifruc=None
                  ): 
     
             print '<html>'
@@ -1033,7 +1063,7 @@ class Database:
             #        i += 1
                 
             for tree in self.trees.keys():
-    
+                                       
                 # set outgroup leaves, labels and label colors
                 outgroup_list = []
                 all_heatmap_profile_values = []
@@ -1111,6 +1141,12 @@ class Database:
     
                 # ladderize
                 self.trees[tree][0].ladderize()
+            
+                if multifruc:
+                    keep = []
+                    for n in self.trees[tree][0].traverse():
+                        if n.support < multifruc and not n.is_leaf():
+                            n.delete()
     
                 # node bg colors
                 if node_bg_color:
@@ -1131,8 +1167,8 @@ class Database:
                         
                     
                 self.trees[tree][0].render(fig_folder + "/"+self.trees[tree][0].get_leaves()[0].tree_method_id+'.png',w=1000, tree_style=ts)
-                print('<A href=file:'+
-                       fig_folder + "/"+self.trees[tree][0].get_leaves()[0].tree_method_id+'.png'+
+                print('<A href=file://'+
+                       fig_folder + "/" + self.trees[tree][0].get_leaves()[0].tree_method_id+'.png'+
                        '>'+self.trees[tree][0].get_leaves()[0].tree_method_id+
                        '</A><BR>')
             print '</html>'
@@ -1443,14 +1479,60 @@ class RaxmlTreeReconstructionMethod:
 from pylab import *
 import random
 
-def draw_boxplot(dictionary): #'locus':[values]
+def draw_boxplot(dictionary, y_axis_label): #'locus':[values]
+    import numpy as np
+    import matplotlib.pyplot as plt
     items = dictionary.items()
     items.sort()
+    
     data = [locus[1] for locus in items]
-    labels = [locus[0] for locus in items]
-    fig = figure()
-    boxplot(data)
-    xticks(range(len(data)+1)[1:], labels)
+        
+    fig, ax1 = plt.subplots(figsize=(4,6))
+    #plt.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
+
+    #bp = plt.boxplot(data, widths=0.75, patch_artist=True)
+    bp = plt.boxplot(data, patch_artist=True)
+    
+    for box in bp['boxes']:
+    # change outline color
+        box.set( color='black', linewidth=1)
+        
+    # change fill color
+        box.set( facecolor = 'red', alpha=0.85 )
+        
+    # change color, linestyle and linewidth of the whiskers
+    for whisker in bp['whiskers']:
+        whisker.set(color='gray', linestyle='solid', linewidth=2.0)
+
+    # change color and linewidth of the caps
+    for cap in bp['caps']:
+        cap.set(color='gray', linewidth=2.0)
+
+    # change color and linewidth of the medians
+    for median in bp['medians']:
+        #median.set(color='#b2df8a', linewidth=2)
+        median.set(color='white', linewidth=2)
+
+    # change the style of fliers and their fill
+    for flier in bp['fliers']:
+        flier.set(marker='o', color='#e7298a', alpha=0.5)
+    
+    # Add a light horizontal grid to the plot
+    ax1.yaxis.grid(True, linestyle='-', which='major', color='lightgrey',
+              alpha=0.7)
+    
+    # Hide these grid behind plot objects
+    ax1.set_axisbelow(True)
+    
+    #set title and axis labels
+    #ax1.set_title('Sequence length distribution per locus\n', size=18)
+    
+    xlabels = [locus[0] for locus in items]
+    xticks(range(len(data)+1)[1:], xlabels, size=14, rotation='vertical')
+    subplots_adjust(left=0.3)
+    
+    ax1.set_ylabel(y_axis_label, size=18)
+    
     name = str(random.randint(1000,2000))
     fig.savefig(name+'.png')
     return name+'.png'
@@ -1493,17 +1575,20 @@ def report_methods(db, figs_folder):
                 lengths_dict[locus_name] = []
                 for record in db.records_by_locus[locus_name]:
                     lengths_dict[locus_name].append(len(record.seq))
-            fig_filename = draw_boxplot(lengths_dict)
+            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)')
             title = 'Distribution of sequence lengths'
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
             if os.path.isfile(fig_filename):
                 data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                img_tag = '<img height=400 src="data:image/png;base64,{0}">'.format(data_uri)
+                img_tag = '<img height=600 src="data:image/png;base64,{0}">'.format(data_uri)
                 report_lines.append(img_tag)
                 os.remove(fig_filename)
             
             for stat in ('GC_content', 'nuc_degen_prop', 'prot_degen_prop'):
                 stat_dict = {}
+                ylabel = 'GC ontent (%)'
+                if not stat == 'GC_content':
+                    ylabel = 'Aambiguous positions (prop)'
                 for locus_name in db.records_by_locus.keys():
                     stat_dict[locus_name] = []
                     for i in db.records_by_locus[locus_name]:
@@ -1512,12 +1597,12 @@ def report_methods(db, figs_folder):
                                 if feature.qualifiers['feature_id'][0] == i.id:
                                     if stat in feature.qualifiers.keys():
                                         stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
-                fig_filename = draw_boxplot(stat_dict)
+                fig_filename = draw_boxplot(stat_dict, ylabel)
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 if os.path.isfile(fig_filename):
                     data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img height=600 src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_filename)
 
