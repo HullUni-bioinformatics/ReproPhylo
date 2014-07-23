@@ -100,7 +100,7 @@ class Concatenation:
 def platform_report():
     import pkg_resources
     modules = []
-    for i in ('ete2','biopython','dendropy'):
+    for i in ('ete2','biopython','dendropy','cloud'):
         modules.append(i+' version: '+
                             pkg_resources.get_distribution(i).version)
     return(['Platform: '+platform.platform(aliased=0, terse=0),
@@ -113,7 +113,12 @@ def platform_report():
             ['User: ' +platform.uname()[1]])
 
 
-
+def write_alns(db, format = 'fasta'):
+    if len(db.alignments.keys()) == 0:
+        raise IOError('Align the records first')
+    else:
+        for key in db.alignments:
+            AlignIO.write(db.alignments[key], key+'_aln.'+format, format)
 
 
 
@@ -980,7 +985,7 @@ class Database:
                     for record in alignment:
                         if record.id == leaf_feature_value:
                             l.add_feature('aligned_sequence',str(record.seq))
-                    t_aln = db.trimmed_alignments[aln_name]
+                    t_aln = self.trimmed_alignments[aln_name]
                     
                 leaf_feature_value = getattr(l, otu_feature)
                 for record in t_aln:
@@ -1535,6 +1540,7 @@ def draw_boxplot(dictionary, y_axis_label): #'locus':[values]
     
     name = str(random.randint(1000,2000))
     fig.savefig(name+'.png')
+    close('all')
     return name+'.png'
     
 def report_methods(db, figs_folder):
@@ -1713,7 +1719,8 @@ def report_methods(db, figs_folder):
         report_lines += ('<h1>Trees</h1>','')
         
         for tree in db.trees.keys():
-            report_lines += ('<h2>'+tree+'</h2>','<pre style="white-space:normal;">','Tree Method ID: '+db.trees[tree][0].get_leaves()[0].tree_method_id,'</pre>')
+            report_lines += ('<h2>'+tree+'</h2>','<pre style="white-space:normal;">',
+                             'Tree Method ID: '+db.trees[tree][0].get_leaves()[0].tree_method_id,'</pre>')
             
             report_lines += ('<h3>newick format</h3>','','<pre style="white-space:normal;">',db.trees[tree][0].write(),'</pre>','')
             report_lines += ('<h3>nhx format</h3>','','<pre>',db.trees[tree][1],'</pre>','','','','')
@@ -1721,7 +1728,9 @@ def report_methods(db, figs_folder):
             
             
             if os.path.isfile(figs_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
-                data_uri = open(figs_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png', 'rb').read().encode('base64').replace('\n', '')
+                data_handle = open(figs_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png','rb')
+                data_uri = data_handle.read().encode('base64').replace('\n', '')
+                data_handle.close()
                 img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
                 report_lines.append(img_tag)
 
@@ -1732,6 +1741,63 @@ def report_methods(db, figs_folder):
             
         return report_lines
 
+def publish(db, folder_name, figures_folder):
+    
+    
+    def pickle_db(db, pickle_file_name):
+        import os
+        if os.path.exists(pickle_file_name):
+            os.remove(pickle_file_name)
+        import cloud.serialization.cloudpickle as pickle
+        output = open(pickle_file_name,'wb')
+        pickle.dump(db, output)
+        output.close()
+        return pickle_file_name
+    
+    def unpickle_db(pickle_file_name):
+        import cloud.serialization.cloudpickle as pickle
+        pickle_handle = open(pickle_file_name, 'rb')
+        return pickle.pickle.load(pickle_handle)
+    
+    
+    import os, time
+    folder = None
+    zip_file = None
+    if folder_name.endswith('.zip'):
+        zip_file = folder_name
+        folder = folder_name[:-4]
+    else:
+        folder = folder_name
+        zip_file = folder_name + '.zip'
+    if os.path.exists(folder) or os.path.exists(zip_file):
+        raise IOError(folder_name + ' already exists')
+    
+    os.makedirs(folder)
+    db.write(folder+'/tree_and_alns.nexml','nexml')
+    db.write(folder+'/sequences_and_metadata.gb','genbank')
+    report = open(folder+'/report.html','wt')
+    for line in report_methods(db, figures_folder):
+        report.write(line + '\n')
+    report.close()
 
+    for tree in db.trees.keys():
+        if os.path.isfile(figures_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
+            from shutil import copyfile
+            copyfile(figures_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png',
+                     folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
+            
+         
+    pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
+    pickle_db(db, folder + '/' + pickle_name)
+    
+    import zipfile, shutil
+
+    zf = zipfile.ZipFile(zip_file, "w")
+    for dirname, subdirs, files in os.walk(folder):
+        zf.write(dirname)
+        for filename in files:
+            zf.write(os.path.join(dirname, filename))
+    zf.close()
+    shutil.rmtree(folder)
     
     
