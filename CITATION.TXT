@@ -1,0 +1,9 @@
+Szitenberg A, Lunt DH (2014) ReproPhylo - a reproducible phylogenetics pipeline. https://github.com/HullUni-bioinformatics/ReproPhylo
+
+@MISC{Szitenberg_undated-jk,
+  title     = "{ReproPhylo} - A Reproducible Phylogenetics pipeline",
+  booktitle = "{GitHub}",
+  author    = "Szitenberg, Amir and Lunt, David H",
+  abstract  = "ReproPhylo - Reproducible Phylogenetics",
+  copyright = "CCO"
+}
