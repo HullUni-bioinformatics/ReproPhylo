@@ -1,0 +1,39 @@
+
+<tool id="read_denovo_data" name="read denovo data" version="0.1" hidden="false">
+    <description>Read denovo data from an unaligned fasta file.
+    The file have to be either DNA or Protein but not mixed. Can run twice,
+    once with DNA and once with prot.
+    </description>
+    <command interpreter="python">
+        #if $cond.add_feature=="yes"
+            read_denovo_data.py $picklein $fasta $chartype $cond.feature_type $cond.feature_name $cond.original_id_is $cond.original_desc_is $cond.together $ReproPhylo_DB_file
+        #else
+            read_denovo_data.py $picklein $fasta $chartype $ReproPhylo_DB_file
+        #end if
+    </command>
+    <inputs>
+        <param name="picklein" type="data" label="ReproPhylo DB file (.pkl)"/>
+        <param name="fasta" type="data" label="fasta file"/>
+        <param name="chartype" type="select" label="sequence type">
+            <option value="dna">nucleotide</option>
+            <option value="prot">protein</option>
+        </param>
+        <conditional name="cond">
+            <param name="add_feature" type="select" label="add a sequence feature?">
+                <option value="no">no</option>
+                <option value="yes">yes</option>
+            </param>
+            <when value="no"/>
+            <when value="yes">
+                <param name="feature_name" type="text" label="gene name"/>
+                <param name="feature_type" type="text" label="a genank sequence feature, eg, CDS or rRNA"/>
+                <param name="original_id_is" type="text" label="what type of info is your first fasta header word?"/>
+                <param name="original_desc_is" type="text" label="what type of info is in the rest of the header?"/>
+                <param name="together" type="text" label="Taken together, they are..."/>
+            </when>
+        </conditional>
+    </inputs>
+    <outputs>
+        <data name="ReproPhylo_DB_file" label="${tool.name} on ${on_string}: ReproPhylo DB file (.pkl)" />
+    </outputs>
+</tool>

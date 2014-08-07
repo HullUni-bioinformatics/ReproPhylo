@@ -1,6 +1,6 @@
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform
+import os, csv, sys, dendropy, re, time, random, glob, platform#, subprocess
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
@@ -71,6 +71,8 @@ class Concatenation:
     otu_meta = 'NotSet'
     concat_must_have_all_of = []
     concat_must_have_one_of = []
+    define_trimmed_alns = [] #should be Locus_name@Alignment_method_name@Trimming_mathod_name
+    
     feature_id_dict = {}
     
     def __init__(self,
@@ -78,13 +80,16 @@ class Concatenation:
                  loci = loci,
                  otu_meta = otu_meta,
                  concat_must_have_all_of = concat_must_have_all_of,
-                 concat_must_have_one_of = concat_must_have_one_of):
+                 concat_must_have_one_of = concat_must_have_one_of,
+                 define_trimmed_alns = define_trimmed_alns):
         self.name = name
         self.loci = loci
         self.otu_meta = otu_meta
         self.concat_must_have_all_of = concat_must_have_all_of
         self.concat_must_have_one_of = concat_must_have_one_of
         self.feature_id_dict = {}
+        self.define_trimmed_alns = define_trimmed_alns
+        self.used_trimmed_alns = {}
         seen = []
         for locus in loci:
             if not isinstance(locus, Locus):
@@ -93,6 +98,26 @@ class Concatenation:
                 raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
             else:
                 seen.append(locus.name)
+                
+    def __str__(self):
+        loci_names = [i.name for i in self.loci]
+        loci_string = ''
+        for l in loci_names:
+            loci_string += l+','
+        loci_string = loci_string[:-1]
+        must_have = ''
+        for i in self.concat_must_have_all_of:
+            must_have += i+','
+        must_have = must_have[:-1]
+        trimmed_alignmnets_spec = ''
+        one_of = str(self.concat_must_have_one_of)
+        if (self.define_trimmed_alns) > 0:
+            for i in self.define_trimmed_alns:
+                trimmed_alignmnets_spec += i
+        return """Concatenation named %s, with loci %s,
+of which %s must exist for all species
+and at least one of each group of %s is represented.
+Alignments with the following names: %s are prefered""" % (self.name, loci_string, must_have, one_of, trimmed_alignmnets_spec)
         
 # tools to prepare the db
 
@@ -409,6 +434,7 @@ class Database:
                 source.qualifiers['original_id'] = [record.id]
                 source.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
                 record.id = 'denovo'+str(count)
+                record.name = record.id
                 source.qualifiers['feature_id'] = [record.id+'_source']
                 record.features = [source]
                 if char_type == 'prot':
@@ -489,47 +515,50 @@ class Database:
     def make_concatenation_alignments(self):
         for s in self.concatenations:
             
-            # get a non-redundant list of 'accross partitions' ids stored in 'meta', such as voucher specimen
+            # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
             
             meta = s.otu_meta
-            meta_list = []
+            OTU_list = []
             for record in self.records:
                 for feature in record.features:
                     if not feature.type == 'source':
                         qualifiers_dictionary = get_qualifiers_dictionary(self,
                                                                           feature.qualifiers['feature_id'])
                         if (meta in qualifiers_dictionary.keys() and
-                            not qualifiers_dictionary[meta] in meta_list):
-                            meta_list.append(qualifiers_dictionary[meta])
+                            not qualifiers_dictionary[meta] in OTU_list):
+                            OTU_list.append(qualifiers_dictionary[meta])
                             
             # make lists of available feature_ids in each locus
             available_features = {}
             for locus in s.loci:
                 available_features[locus.name] = []
                 for record in self.records_by_locus[locus.name]:
-                    available_features[locus.name].append(record.id)
+                    available_features[locus.name].append(record.id) # record ids are feature ids because taken from db.records_by_locus
                     
-            # make a dict of individuals that fulfil the set's first rule
+            
+            
+                    
+            # make a dict of individuals that fulfil the concat's first rule
             
             seen_locus_names = []
-            
             included_individuals = {}
-            for individual in meta_list:
+            
+            for individual in OTU_list:
                 include = True
-                for locus_name in s.concat_must_have_all_of:
-                    if not locus_name in seen_locus_names:
-                        seen_locus_names.append(locus_name)
+                for must_have_locus_name in s.concat_must_have_all_of:
+                    if not must_have_locus_name in seen_locus_names:
+                        seen_locus_names.append(must_have_locus_name)
                     locus_specific_features = []
-                    for feature_id in available_features[locus_name]:
+                    for feature_id in available_features[must_have_locus_name]:
                         qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
                         if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
                             locus_specific_features.append(feature_id)
                     if len(locus_specific_features) == 1:
                         if not individual in included_individuals.keys():
                             included_individuals[individual] = {}
-                        included_individuals[individual][locus_name] = locus_specific_features[0]
+                        included_individuals[individual][must_have_locus_name] = locus_specific_features[0]
                     elif len(locus_specific_features) > 1:
-                        raise RuntimeError(individual + ' is not unique for ' + locus_name)
+                        raise RuntimeError(individual + ' is not unique for ' + must_have_locus_name)
                     else:
                         include = False
                 if individual in included_individuals.keys() and not include:
@@ -565,13 +594,14 @@ class Database:
             
             for individual in included_individuals.keys():
                 for locus in s.loci:
+                    locus_specific_features = []
                     if not locus.name in seen_locus_names:
                         for feature_id in available_features[locus.name]:
                             qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
                             if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
                                 locus_specific_features.append(feature_id)
                         if len(locus_specific_features) == 1:
-                            included_individuals[locus.name] = locus_specific_features[0]
+                            included_individuals[individual][locus.name] = locus_specific_features[0]
                         elif len(locus_specific_features) > 1:
                             raise RuntimeError(individual + ' is not unique for ' + locus.name)
                         
@@ -580,13 +610,41 @@ class Database:
             
             concat_records = []
             alignment = []
+            keys_of_trimmed_alignments_to_use_in_concat = []
+            for locus in s.loci:
+                trimmed_aln = None
+                all_locus_trimmed_alns_in_db = []
+                for key in self.trimmed_alignments.keys():
+                    if locus.name == key.split('@')[0]:
+                        all_locus_trimmed_alns_in_db.append(key)
+                if len(all_locus_trimmed_alns_in_db) == 1:
+                    trimmed_aln = all_locus_trimmed_alns_in_db[0]
+                elif len(all_locus_trimmed_alns_in_db) == 0:
+                    raise RuntimeError('Locus '+locus.name+' have no trimmed alignments')
+                else:
+                    s.define_trimmed_alns.sort(key = lambda i: i.count('@'), reverse=True)
+                    for definition in s.define_trimmed_alns:
+                        if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
+                            trimmed_aln = definition
+                        elif definition.count('@') == 1 and bool(any(definition in i for i in all_locus_trimmed_alns_in_db)):
+                            trimmed_aln = locus.name+'@'+definition
+                        else:
+                            raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
+                                                locus.name+"' out of "+str(locus_trimmed_alns))
+                if trimmed_aln:
+                    keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
+                else:
+                    raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
+
             for individual in included_individuals.keys():
                 sequence = ''
-                for locus in s.loci:
-                    length = len(self.trimmed_alignments[locus.name][0])
-                    if locus.name in included_individuals[individual].keys():
-                        for record in self.trimmed_alignments[locus.name]:
-                            if record.id == included_individuals[individual][locus.name]:
+                for key in keys_of_trimmed_alignments_to_use_in_concat:
+                    locus_name = key.split('@')[0]                    
+                    length = len(self.trimmed_alignments[key][0])
+                    s.used_trimmed_alns[key] = length
+                    if locus_name in included_individuals[individual].keys():
+                        for record in self.trimmed_alignments[key]:
+                            if record.id == included_individuals[individual][locus_name]:
                                 sequence += str(record.seq)
                     else:
                         sequence += 'N'*length
@@ -823,12 +881,13 @@ class Database:
                     method.platform.append('Program and version: Get mafft to spit version to stdout')
                 for locus in method.loci:
                     if locus.name in seen_loci:
-                        raise RuntimeError('locus '+locus.name+' is in more than one AlignmentMethod objects')
+                        #raise RuntimeError('locus '+locus.name+' is in more than one AlignmentMethod objects')
+                        pass
                     else:
                         seen_loci.append(locus.name)
                     stdout, stderr = method.command_lines[locus.name]()
                     align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.protein)
-                    if method.CDSAlign and locus.feature_type == 'CDS':
+                    if method.CDSAlign and locus.feature_type == 'CDS' and locus.char_type == 'dna':
                         for seq in align:
                             found = 0
                             for s in method.CDS_in_frame[locus.name]:
@@ -861,7 +920,7 @@ class Database:
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
                         #align = codon_aln
                     method_files = glob.glob(method.id+'_*')
-                    self.alignments[locus.name] = align
+                    self.alignments[locus.name+'@'+method.method_name] = align
                 method.timeit.append(time.time())
                 method.timeit.append(method.timeit[2]-method.timeit[1])
                 for f in method_files:
@@ -898,15 +957,19 @@ class Database:
                     t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'0')
                 elif raxml_method.preset == 'fD_fb':
                     t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'1')
+                elif raxml_method.preset == 'fd_b_fb':
+                    t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'2')
+                    
             
                 for n in t.traverse():
                     n.add_feature('tree_method_id', str(raxml_method.id)+'_'+trimmed_alignment)
                 t.dist = 0
                 t.add_feature('tree_method_id', str(raxml_method.id)+'_'+trimmed_alignment)
+                
            
                 loci_names = [i.name for i in  self.loci]       
                 concat_names = [c.name for c in self.concatenations]
-                if trimmed_alignment in loci_names:
+                if trimmed_alignment.partition('@')[0] in loci_names:
                         
                         for leaf in t:
                             records = self.records
@@ -929,7 +992,9 @@ class Database:
                                 leaf.add_feature(label, feature_source.qualifiers[f_source_qual][0])
                             for f_qual in feature.qualifiers.keys():
                                 leaf.add_feature(f_qual, feature.qualifiers[f_qual][0])
-                        self.trees[trimmed_alignment] = [t,t.write(features=[])]
+                        for l in t:
+                            t.add_feature('tree_id', trimmed_alignment+'@'+raxml_method.method_name)
+                        self.trees[trimmed_alignment+'@'+raxml_method.method_name] = [t,t.write(features=[])]
                         
                 elif trimmed_alignment in concat_names:
                         s = filter(lambda i: i.name == trimmed_alignment, self.concatenations)[0]
@@ -945,11 +1010,13 @@ class Database:
                                         if s.otu_meta in qual_dict.keys() and qual_dict[s.otu_meta] == leaf.name:
                                             for key in qual_dict.keys():
                                                 leaf.add_feature(key, qual_dict[key])
-                        self.trees[s.name] = [t,t.write(features=[])]
+                        for l in t:
+                            t.add_feature('tree_id', s.name+'@mixed@mixed@'+raxml_method.method_name)
+                        self.trees[s.name+'@mixed@mixed@'+raxml_method.method_name] = [t,t.write(features=[])]
             raxml_method.timeit.append(time.time())
             raxml_method.timeit.append(raxml_method.timeit[2]-raxml_method.timeit[1])
             for file_name in os.listdir(os.curdir):
-                        if raxml_method.id in file_name:
+                        if raxml_method.id.partition('_')[0] in file_name:
                             os.remove(file_name)
         self.used_methods += raxml_methods
         
@@ -971,21 +1038,27 @@ class Database:
             #get aligned and trimmd aligned sequences as leaf features
             t = self.trees[tree_name][0]
             for l in t:
-                aln_name = l.tree_method_id.split('_')[1]
+                loc_name = tree_name.split('@')[0]
+                trim_aln_name = tree_name.rpartition('@')[0]
+                aln_name = None
+                if loc_name in loci_names:
+                    aln_name = tree_name.rsplit('@',2)[0]
+                else:
+                    trim_aln_name = trim_aln_name.split('@')[0]
                 
                 otu_feature = 'feature_id'
-                if aln_name in [c.name for c in self.concatenations]:
+                if not aln_name: # then it is a concatenation
                     for c in self.concatenations:
-                        if c.name == aln_name:
+                        if c.name == loc_name:
                             otu_feature = c.otu_meta
                             
-                if not aln_name in [c.name for c in self.concatenations]:
+                if aln_name: # Then it is a locus
                     leaf_feature_value = getattr(l, otu_feature)
                     alignment = self.alignments[aln_name]
                     for record in alignment:
                         if record.id == leaf_feature_value:
                             l.add_feature('aligned_sequence',str(record.seq))
-                    t_aln = self.trimmed_alignments[aln_name]
+                t_aln = self.trimmed_alignments[trim_aln_name]
                     
                 leaf_feature_value = getattr(l, otu_feature)
                 for record in t_aln:
@@ -1040,7 +1113,7 @@ class Database:
                  heat_map_meta = None, #list
                  heat_map_colour_scheme=2,
                  
-                 multifruc=None
+                 multifurc=None
                  ): 
     
             print '<html>'
@@ -1147,10 +1220,9 @@ class Database:
                 # ladderize
                 self.trees[tree][0].ladderize()
             
-                if multifruc:
-                    keep = []
+                if multifurc:
                     for n in self.trees[tree][0].traverse():
-                        if n.support < multifruc and not n.is_leaf():
+                        if n.support < multifurc and not n.is_leaf():
                             n.delete()
     
                 # node bg colors
@@ -1166,10 +1238,7 @@ class Database:
                         for key in node_support_dict.keys():
                             if (node.support <= node_support_dict[key][0] and
                                 node.support > node_support_dict[key][1]):
-                                node.add_face(CircleFace(radius = 5, color = key),column=0, position = "float")
-
-                    
-                        
+                                node.add_face(CircleFace(radius = 5, color = key),column=0, position = "float")             
                     
                 self.trees[tree][0].render(fig_folder + "/"+self.trees[tree][0].get_leaves()[0].tree_method_id+'.png',w=1000, tree_style=ts)
                 print('<A href=file://'+
@@ -1181,12 +1250,12 @@ class Database:
 
     def trim(self):
         for aln in self.alignments.keys():
-            AlignIO.write(self.alignments[aln],aln+'_trimmed_aln.fasta','fasta')
-            stdout = os.popen('trimal -in '+ aln +'_trimmed_aln.fasta -gappyout').read()
+            AlignIO.write(self.alignments[aln],aln+'_aln.fasta','fasta')
+            stdout = os.popen('trimal -in '+ aln +'_aln.fasta -gappyout').read()
             align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.ambiguous_dna)
             for record in align:
                 record.description = ''
-            self.trimmed_alignments[aln] = align
+            self.trimmed_alignments[aln+'@'+'dummyTrimMethod'] = align
             
             
 class AlignmentMethod:
@@ -1297,6 +1366,30 @@ class AlignmentMethod:
             for c in cline.keys():
                 self.command_lines[locus.name].__setattr__(c,cline[c])
             print str(self.command_lines[locus.name])
+    def __str__(self):
+        loci_string = ''
+        for n in [i.name for i in self.loci]:
+            loci_string += n+','
+        loci_string = loci_string[:-1]
+        command_lines = ''
+        for i in self.command_lines.keys():
+            command_lines += i+': '+str(self.command_lines[i])+'\n'
+        date = str(self.timeit[0])
+        execution = str(self.timeit[3])
+        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+        return """
+AlignmentMethod named %s with ID %s         
+Loci: %s        
+Executed on: %s
+
+Commands:
+%s
+
+Environment:    
+%s
+
+execution time:
+%s""" %(self.method_name, str(self.id), loci_string, date, command_lines, plat,execution)  
 
 
 
@@ -1341,9 +1434,16 @@ def make_raxml_partfile(tree_method, db, trimmed_alignment_name):
             concatenation = c
     
     #concatenation = filter(lambda concatenation: concatenation.name == trimmed_alignment_name, db.concatenations)[0]
-
+    
     model = []
     for locus in concatenation.loci:
+        part_name = None
+        for trm_aln in concatenation.used_trimmed_alns.keys():
+            if locus.name == trm_aln.partition('@')[0]:
+                part_name = trm_aln
+        if not part_name:
+            raise RuntimeError('There is no trimmed alignment for locus '+locus.name+' in concatenation '+concatenation.name)
+        part_length = concatenation.used_trimmed_alns[part_name]
         if locus.char_type == 'prot':
             m = None
             if isinstance(tree_method.matrix,dict):
@@ -1353,11 +1453,9 @@ def make_raxml_partfile(tree_method, db, trimmed_alignment_name):
             else:
                 #todo write error
                 pass
-            length = len(db.trimmed_alignments[locus.name][0])
-            model.append([m,locus.name,length])
+            model.append([m,part_name,part_length])
         elif locus.char_type == 'dna':
-            length = len(db.trimmed_alignments[locus.name][0])
-            model.append(['DNA',locus.name,length])
+            model.append(['DNA',part_name,part_length])
                     
     # make partition file
                     
@@ -1382,7 +1480,7 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
     ML_replicates = 1
     if '-N' in tree_method.cline_args.keys():
         ML_replicates = tree_method.cline_args['-N']
-    elif '-#' in tree_method.cline_args.keys():
+    if '-#' in tree_method.cline_args.keys():
         support_replicates = tree_method.cline_args['-#']
     
     partfile = None
@@ -1390,13 +1488,13 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
     # Check if it is a concatenation and make partfile
 
     for c in db.concatenations:
-        if c.name == trimmed_alignment_name:
+        if c.name == trimmed_alignment_name.partition('@')[0]:
             partfile = make_raxml_partfile(tree_method, db, trimmed_alignment_name)
     
     input_filename = make_raxml_input_matrix_file(tree_method, trimmed_alignment_name)
     model = tree_method.model
     try:
-        locus_char_type = filter(lambda locus: locus.name == trimmed_alignment_name, db.loci)[0].char_type
+        locus_char_type = filter(lambda locus: locus.name == trimmed_alignment_name.partition('@')[0], db.loci)[0].char_type
     except:
         locus_char_type = 'prot'
     
@@ -1418,7 +1516,8 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
                            '-N': support_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
                            '-m': model,
-                           '-T': tree_method.threads}],
+                           '-T': tree_method.threads}
+                      ],
                 'fD_fb':[{'-f': 'D',
                           '-p': random.randint(0,999),
                           '-s': input_filename,
@@ -1432,8 +1531,30 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
                                                        '-m': model,
                                                        '-T': tree_method.threads,
                                                        '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
-                                                       '-z': 'RAxML_rellBootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'0'
-                                                       }
+                                                       '-z': 'RAxML_rellBootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'0'}
+                         ],
+                'fd_b_fb':[{'-f': 'd',
+                          '-p': random.randint(0,999),
+                          '-s': input_filename,
+                          '-N': ML_replicates,
+                           '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
+                           '-m': model,
+                           '-T': tree_method.threads},{
+                                                       '-p': random.randint(0,999),
+                                                       '-b': random.randint(0,999),
+                                                       '-s': input_filename,
+                                                       '-#': support_replicates,
+                                                       '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
+                                                       '-m': model,
+                                                       '-T': tree_method.threads},
+                                                       {'-f': 'b',
+                                                       '-p': random.randint(0,999),
+                                                       '-s': input_filename,
+                                                       '-n': tree_method.id+'_'+trimmed_alignment_name+'2',
+                                                       '-m': model,
+                                                       '-T': tree_method.threads,
+                                                       '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
+                                                       '-z': 'RAxML_bootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'1'}
                          ]
                 }
 
@@ -1484,7 +1605,7 @@ class RaxmlTreeReconstructionMethod:
 from pylab import *
 import random
 
-def draw_boxplot(dictionary, y_axis_label): #'locus':[values]
+def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     import numpy as np
     import matplotlib.pyplot as plt
     items = dictionary.items()
@@ -1492,7 +1613,7 @@ def draw_boxplot(dictionary, y_axis_label): #'locus':[values]
     
     data = [locus[1] for locus in items]
         
-    fig, ax1 = plt.subplots(figsize=(4,6))
+    fig, ax1 = plt.subplots()
     #plt.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
 
     #bp = plt.boxplot(data, widths=0.75, patch_artist=True)
@@ -1534,14 +1655,14 @@ def draw_boxplot(dictionary, y_axis_label): #'locus':[values]
     
     xlabels = [locus[0] for locus in items]
     xticks(range(len(data)+1)[1:], xlabels, size=14, rotation='vertical')
-    subplots_adjust(left=0.3)
+    #subplots_adjust(left=0.3, bottom=0.8)
     
     ax1.set_ylabel(y_axis_label, size=18)
     
     name = str(random.randint(1000,2000))
-    fig.savefig(name+'.png')
+    fig.savefig(figs_folder + '/' + name +'.png')
     close('all')
-    return name+'.png'
+    return figs_folder + '/' + name+'.png'
     
 def report_methods(db, figs_folder):
         report_lines = ['<html>','<head>','<h1>']
@@ -1575,18 +1696,20 @@ def report_methods(db, figs_folder):
         
         os.remove(outfile_name)
         
+        
         if len(db.records_by_locus.keys())>0:
+            scale = str(len(db.records_by_locus.keys())*200)
             lengths_dict = {}
             for locus_name in db.records_by_locus.keys():
                 lengths_dict[locus_name] = []
                 for record in db.records_by_locus[locus_name]:
                     lengths_dict[locus_name].append(len(record.seq))
-            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)')
+            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', figs_folder)
             title = 'Distribution of sequence lengths'
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
             if os.path.isfile(fig_filename):
                 data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                img_tag = '<img height=600 src="data:image/png;base64,{0}">'.format(data_uri)
+                img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
                 report_lines.append(img_tag)
                 os.remove(fig_filename)
             
@@ -1603,18 +1726,23 @@ def report_methods(db, figs_folder):
                                 if feature.qualifiers['feature_id'][0] == i.id:
                                     if stat in feature.qualifiers.keys():
                                         stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
-                fig_filename = draw_boxplot(stat_dict, ylabel)
+                fig_filename = draw_boxplot(stat_dict, ylabel, figs_folder)
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 if os.path.isfile(fig_filename):
                     data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img height=600 src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_filename)
-
-        
-        
+                    
+        composed_concatenations = []
         for c in db.concatenations:
+            if c.name in db.trimmed_alignments.keys():
+                composed_concatenations.append(c)
+        
+        
+        for c in composed_concatenations:
+            
             title = ('content of concatenation \"' + c.name + '\"').title()
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1668,9 +1796,16 @@ def report_methods(db, figs_folder):
 
         report_lines += ['</pre>', '<h2>','Methods','</h2>', '<pre>', '']
         
+        
         for method in db.used_methods:
+            if method[0] == 'AlignmentMethod' or method[0] == 'RaxmlTreeReconstructionMethod':
+                title = method[0]
+                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                for i in method[1:]:
+                    report_lines.append('<strong>'+str(i[0])+'</strong>')
+                    report_lines.append(str(i[1]).replace(',','<br>'))
             
-            if isinstance(method, AlignmentMethod):
+            elif isinstance(method, AlignmentMethod):
                 title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 #--------------------------------------------------------
@@ -1716,10 +1851,66 @@ def report_methods(db, figs_folder):
         
         report_lines += ('</pre>', '','') 
         
+        
+        if len(db.alignments.keys())>0:                    
+            title = 'Alignment statistics before trimming'
+            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+            report_lines += ['</pre>', '<h4>','Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
+            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=False)
+            if os.path.isfile(fig_file):
+                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    report_lines.append(img_tag)
+                    os.remove(fig_file)
+            report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
+            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=False, alg='-sgc')
+            if os.path.isfile(fig_file):
+                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    report_lines.append(img_tag)
+                    os.remove(fig_file)
+               
+        if len(db.trimmed_alignments.keys())>0:          
+            title = 'Alignment statistics after trimming'
+            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+            report_lines += ['</pre>', '<h4>','"Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
+            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=True)
+            if os.path.isfile(fig_file):
+                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    report_lines.append(img_tag)
+                    os.remove(fig_file)
+            report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
+            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=True, alg='-sgc')
+            if os.path.isfile(fig_file):
+                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    report_lines.append(img_tag)
+                    os.remove(fig_file)
+        
+        if len(db.trees.keys())>1:        
+            report_lines += ('','<h1>Robinson-Foulds distances </h1>','')
+            RF_filename, legend = calc_rf(db, figs_folder)
+            scale = str(len(legend)*60)
+            if os.path.isfile(RF_filename):
+                    data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img height='+scale+' width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                    report_lines.append(img_tag)
+                    os.remove(RF_filename)
+            
+            report_lines.append('<h3>Legend<h3><pre>')
+            report_lines += legend
+            report_lines.append('</pre>')
+        
         report_lines += ('<h1>Trees</h1>','')
         
+        
         for tree in db.trees.keys():
-            report_lines += ('<h2>'+tree+'</h2>','<pre style="white-space:normal;">',
+            report_lines += ('<h2>'+tree.split('@')[0]+'</h2>',
+                             '<h3>Alignment method: '+tree.split('@')[1]+'</h3>',
+                             '<h3>Trimming method: '+tree.split('@')[2]+'</h3>',
+                             '<h3>Tree method: '+tree.split('@')[3]+'</h3>',
+                             '<pre style="white-space:normal;">',
                              'Tree Method ID: '+db.trees[tree][0].get_leaves()[0].tree_method_id,'</pre>')
             
             report_lines += ('<h3>newick format</h3>','','<pre style="white-space:normal;">',db.trees[tree][0].write(),'</pre>','')
@@ -1733,18 +1924,14 @@ def report_methods(db, figs_folder):
                 data_handle.close()
                 img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
                 report_lines.append(img_tag)
-
-        
-        
+                
         report_lines.append('</body>')
         report_lines.append('</html>')
             
         return report_lines
-
-def publish(db, folder_name, figures_folder):
     
-    
-    def pickle_db(db, pickle_file_name):
+        
+def pickle_db(db, pickle_file_name):
         import os
         if os.path.exists(pickle_file_name):
             os.remove(pickle_file_name)
@@ -1754,11 +1941,52 @@ def publish(db, folder_name, figures_folder):
         output.close()
         return pickle_file_name
     
-    def unpickle_db(pickle_file_name):
+def unpickle_db(pickle_file_name):
         import cloud.serialization.cloudpickle as pickle
         pickle_handle = open(pickle_file_name, 'rb')
-        return pickle.pickle.load(pickle_handle)
-    
+        pkl_db = pickle.pickle.load(pickle_handle)
+        new_db = Database(pkl_db.loci)
+        attr_names = ['alignments',
+                      'concatenations',
+                      'records',
+                      'records_by_locus',
+                      'trees',
+                      'trimmed_alignments',
+                      ]
+        
+        for attr_name in attr_names:
+           setattr(new_db,attr_name,getattr(pkl_db,attr_name))
+            
+        for i in pkl_db.used_methods:
+            if isinstance(i, list) and (i[0] == 'AlignmentMethod' or i[0] == 'RaxmlTreeReconstructionMethod'):
+                new_db.used_methods.append(i)
+            else:
+                
+                include = ['id',
+                           'method_name',
+                           'CDSAlign',
+                           'program_name',
+                           'loci',
+                           'command_lines',
+                           'timeit',
+                           'platform',
+                           'cmd',
+                           'preset',
+                           'model',
+                           'trimmed_alignments']
+            
+                method_list = []
+                if isinstance(i, AlignmentMethod):
+                    method_list.append('AlignmentMethod')
+                elif isinstance(i, RaxmlTreeReconstructionMethod):
+                    method_list.append('RaxmlTreeReconstructionMethod')
+                for attr in include:
+                    if attr in dir(i):
+                        method_list.append([attr, str(getattr(i,attr))])
+                new_db.used_methods.append(method_list)
+        return new_db
+
+def publish(db, folder_name, figures_folder):
     
     import os, time
     folder = None
@@ -1789,9 +2017,10 @@ def publish(db, folder_name, figures_folder):
          
     pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
     pickle_db(db, folder + '/' + pickle_name)
+
     
     import zipfile, shutil
-
+    
     zf = zipfile.ZipFile(zip_file, "w")
     for dirname, subdirs, files in os.walk(folder):
         zf.write(dirname)
@@ -1800,4 +2029,126 @@ def publish(db, folder_name, figures_folder):
     zf.close()
     shutil.rmtree(folder)
     
+def calc_rf(db, figs_folder):
+    meta = 'feature_id'
+    if len(db.concatenations) > 0:
+        meta = db.concatenations[0].otu_meta
+
+    trees = db.trees.keys()
+
+    data = []
+
+    for t1 in trees:
+        line = []
+        dupT1 = db.trees[t1][0].copy()
+        for l in dupT1:
+            for record in db.records:
+                for feature in record.features:
+                    if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
+                        l.name = feature.qualifiers[meta][0]
+        for t2 in trees:
+            dupT2 = db.trees[t2][0].copy()
+            for l in dupT2:
+                for record in db.records:
+                    for feature in record.features:
+                        if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
+                            l.name = feature.qualifiers[meta][0]
+            rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2)        
+            line.append(rf/float(max_rf))        
+        data.append(line)   
     
+    row_labels = [str(i) for i in range(len(trees))]
+    column_labels = row_labels
+    legend = ['#'.ljust(10,' ')+'LOCUS'.ljust(20,' ')+'ALIGNMENT METHOD'.ljust(20,' ')+'TRIMMING METHOD'.ljust(20,' ')+'TREE METHOD'.ljust(20,' ')]
+    for i in trees:
+        line = str(trees.index(i)).ljust(10,' ')
+        for val in i.split('@'):
+            line += val.ljust(20,' ')
+        legend.append(line)
+    fig, ax = plt.subplots()
+    data = np.array(data)
+    heatmap = ax.pcolor(data, cmap=plt.cm.Blues)
+
+    # put the major ticks at the middle of each cell
+    ax.set_xticks(np.arange(data.shape[0])+0.5, minor=False)
+    ax.set_yticks(np.arange(data.shape[1])+0.5, minor=False)
+
+    # want a more natural, table-like display
+    ax.invert_yaxis()
+    ax.xaxis.tick_top()
+
+    ax.set_xticklabels(row_labels, minor=False, size=14, rotation='vertical')
+    ax.set_yticklabels(column_labels, minor=False, size=14)
+    #fig.set_size_inches(12.5,12.5)
+    
+    name = str(random.randint(1000,2000))
+    fig.savefig(figs_folder + '/' + name +'.png')
+    close('all')
+    return figs_folder + '/' + name+'.png', legend 
+
+def draw_trimal_scc(db, num_col, figs_folder, trimmed=False, alg = '-scc'):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import random, os
+    from Bio import AlignIO
+    
+    # get the alignment objects
+    #-------------------------#
+    alignments = db.alignments.items()
+    if trimmed:
+        alignments = db.trimmed_alignments.items()
+    num_alns = len(alignments)
+
+    subplots_arrangement = []
+    #-----------------------#
+    num_rows = round(float(num_alns)/num_col)
+    if num_rows < float(num_alns)/num_col:
+        num_rows += 1
+        
+    fig = plt.figure(figsize=(10*num_col,2.3*num_rows), dpi=80, frameon = False)
+    plt.subplots_adjust(hspace = 0.8)
+    subplots_arrangement += [num_rows, num_col]
+
+    
+    #Calc with trimal and plot
+    #------------------------#
+    for i in range(1,num_alns+1):
+        import subprocess as sub
+        subplot_position = subplots_arrangement +[i]
+        aln_name = alignments[i-1][0]
+        aln_obj = alignments[i-1][1]
+        name = str(random.randint(1000,2000))+'_'+aln_name+'_for_trimal_graph.fasta'
+        AlignIO.write(aln_obj, name, 'fasta')
+        stderr = open('stderr','wt')
+        #stdout = os.popen('trimal '+alg+' -in '+name)#.read()
+        stdout = sub.Popen("trimal "+alg+" -in " + name,
+                       shell=True, stdout=sub.PIPE, stderr=stderr).stdout
+        stderr.close()
+        var = pd.read_table(stdout, sep='\t+', skiprows=3, engine='python')
+        os.remove('stderr')
+        if alg == '-scc':
+            var.columns = ['position', 'variability']
+        elif alg == '-sgc':
+            var.columns = ['position', 'pct_gaps', 'gap_score']
+        
+        #Plot residue similarity figure, for nucleotides this is identity value 
+        fig.add_subplot(subplot_position[0], subplot_position[1], subplot_position[2])
+        if alg == '-scc':
+            var.variability.plot(color='g',lw=2)
+        elif alg == '-sgc':
+            var.pct_gaps.plot(color='g',lw=2)
+        plt.title(aln_name.replace('@',' '), fontsize=14)
+        plt.axis([1,len(aln_obj[0].seq), 0, 1.1]) #0 to 1 scale for y axis
+        xlab = "alignment position"
+        ylab = "similarity score"
+        if alg == '-sgc':
+            ylab = "percent gaps"
+            plt.axis([1, len(aln_obj[0].seq), 0, 110]) #0 to 100 scale for y axis, ie percent
+        plt.xlabel(xlab, fontsize=10)
+        plt.ylabel(ylab, fontsize=10)
+        plt.grid(True)
+        os.remove(name)
+    figname = str(random.randint(1000,2000))
+    fig.savefig(figs_folder + '/' + figname +'.png')
+    plt.close('all')
+    return figs_folder + '/' + figname+'.png'
