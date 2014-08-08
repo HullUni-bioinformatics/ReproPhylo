@@ -1,4 +1,38 @@
 
+##############################################################################################
+if False:
+    """
+    ReproPhylo version 0.1 
+    
+    General purpose phylogenetics package for reproducible and experimental analysis
+    
+    Amir Szitenebrg
+    A.Szitenberg@Hull.ac.uk
+    Szitenberg@gmail.com
+    
+    David H Lunt
+    D.H.Lunt@Hull.ac.uk
+    
+    EvoHull.org
+    University of Hull
+    
+    
+    Dependencies:
+    Python 2.7.6
+    ete2 2.2rev1056
+    biopython 1.64
+    dendropy 3.12.0
+    cloud 2.8.5
+    
+    RAxML 8
+    Muscle
+    Mafft
+    Pal2nal
+    """
+##############################################################################################
+
+
+
 from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform#, subprocess
 from Bio.Seq import Seq
@@ -11,12 +45,21 @@ from Bio import AlignIO
 from Bio.Phylo.Applications import RaxmlCommandline
 from Bio.Align import MultipleSeqAlignment
 from Bio.SeqUtils import GC
-#from cogent import LoadSeqs, LoadTree
-#from cogent.app.raxml_v730 import build_tree_from_alignment
 from ete2 import *
 
+
+
+##############################################################################################
 class Locus:
-       
+##############################################################################################
+
+    """ Configure the loci stored in the ReproPhylo DB.
+        
+    >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+    >>> print(locus)
+    Locus(char_type=dna, feature_type=CDS, name=coi, aliases=cox1; COX1; coi; COI; CoI)
+    """
+
     char_type = 'NotSet'
     feature_type = 'NotSet'
     name = 'NotSet'
@@ -24,11 +67,6 @@ class Locus:
 
     def __init__(self, char_type=char_type, feature_type=feature_type,
                  name=name, aliases=aliases):
-        """ Use to tell ReproPhylo which partition to build from a mixed (or not) data.
-        
-        >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> print locus
-        Locus(char_type=dna, feature_type=CDS, name=coi, aliases=cox1; COX1; coi; COI; CoI)"""
 
         
         self.char_type = char_type
@@ -56,15 +94,32 @@ class Locus:
         aliases_str = ('; ').join(self.aliases)
         return ('Locus(char_type='+self.char_type+', feature_type='+self.feature_type+
                 ', name='+self.name+', aliases='+aliases_str+')')
-            
-                
 
-#if __name__ == "__main__":
-#    import doctest
-#    doctest.testmod() 
-       
-
+    
+    
+##############################################################################################
 class Concatenation:
+##############################################################################################
+
+    """This class is used to configure concatenations given loci and rules.
+    
+    >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+    >>> ssu = Locus('dna', 'rRNA', '18S', ['18S rRNA','SSU rRNA'])
+    >>> bssu = Locus('dna', 'rRNA', '16S', ['16S rRNA'])
+    >>> lsu = Locus('dna', 'rRNA', '28S', ['28S rRNA', 'LSU rRNA'])
+    >>> alg11 = Locus('dna', 'CDS', 'ALG11', ['ALG11'])
+    >>> loci = [coi, ssu, bssu, lsu, alg11]
+    >>> concatenation = Concatenation(name='combined', loci=loci,
+    ...                                otu_meta='OTU_name',
+    ...                                concat_must_have_all_of=[coi],
+    ...                                concat_must_have_one_of =[[bssu,lsu],[alg11,ssu]],
+    ...                                define_trimmed_alns=["MuscleDefaults@dummyTrimMethod"])
+    >>> print(str(concatenation))
+    Concatenation named combined, with loci coi,18S,16S,28S,ALG11,
+    of which coi must exist for all species
+    and at least one of each group of [ 16S 28S ][ ALG11 18S ] is represented.
+    Alignments with the following names: MuscleDefaults@dummyTrimMethod are prefered
+    """
     
     name = 'NotSet'
     loci = []
@@ -98,6 +153,8 @@ class Concatenation:
                 raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
             else:
                 seen.append(locus.name)
+      
+                
                 
     def __str__(self):
         loci_names = [i.name for i in self.loci]
@@ -107,22 +164,45 @@ class Concatenation:
         loci_string = loci_string[:-1]
         must_have = ''
         for i in self.concat_must_have_all_of:
-            must_have += i+','
+            must_have += i.name+','
         must_have = must_have[:-1]
         trimmed_alignmnets_spec = ''
-        one_of = str(self.concat_must_have_one_of)
+        one_of = ''
+        for i in self.concat_must_have_one_of:
+            one_of += '[ '
+            for j in i:
+                one_of += j.name+' '
+            one_of += ']'
         if (self.define_trimmed_alns) > 0:
             for i in self.define_trimmed_alns:
                 trimmed_alignmnets_spec += i
-        return """Concatenation named %s, with loci %s,
-of which %s must exist for all species
-and at least one of each group of %s is represented.
-Alignments with the following names: %s are prefered""" % (self.name, loci_string, must_have, one_of, trimmed_alignmnets_spec)
+        return ("Concatenation named %s, with loci %s,\n"
+                "of which %s must exist for all species\n"
+                "and at least one of each group of %s is represented.\n"
+                "Alignments with the following names: %s are prefered"
+                % (self.name, loci_string, must_have, one_of, trimmed_alignmnets_spec))
         
-# tools to prepare the db
+        
+        
+##############################################################################################
+if False:
+    """
+    Reprophylo Database Utilities
+    
+    Used in the Database class but are not in the classes methods
+    """
+##############################################################################################
+
 
 
 def platform_report():
+    
+    """ 
+    Prints machine specs, os specs and dependencies at time of execution
+    
+    >>> isinstance(platform_report(), list)
+    True
+    """
     import pkg_resources
     modules = []
     for i in ('ete2','biopython','dendropy','cloud'):
@@ -138,7 +218,12 @@ def platform_report():
             ['User: ' +platform.uname()[1]])
 
 
+
 def write_alns(db, format = 'fasta'):
+    """
+    Writes untrimmed sequence alignment files that are in db in a biopython format
+    """
+    
     if len(db.alignments.keys()) == 0:
         raise IOError('Align the records first')
     else:
@@ -152,14 +237,17 @@ def keep_feature(feature, loci):
     """ Returns true if a feature's type is in one of the loci and if the gene
     or product qualifiers is in the aliases of one of the loci
     
+    # making a dummy feature
     >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
     >>> location = FeatureLocation(1,100)
     >>> feature = SeqFeature()
     >>> feature.location = location
     >>> feature.type = 'CDS'
     >>> feature.qualifiers['gene'] = ['CoI']
+    
+    # testing if fits any of the Database Locus objects
     >>> a = keep_feature(feature, [coi])
-    >>> print a
+    >>> print(a)
     True"""
     
     keep = 0
@@ -181,12 +269,19 @@ def keep_feature(feature, loci):
     else:
         return False
   
+    
+    
 def dwindle_record(record, loci):
     
-    """ retains only features that are called by guides and records with features that are
-        called by guides
-        
+    """ 
+    Retains only features that are called by Locus objects and records with features that are
+    called by Locus objects
+    
+    # Making a dummy locus    
     >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
+    
+    # Making a dummy record with a feature that fits a Locus object (kept_feature)
+    # and a feature that does not (dwindled_feature)
     >>> location = FeatureLocation(1,100)
     >>> kept_feature = SeqFeature()
     >>> kept_feature.location = location
@@ -197,14 +292,17 @@ def dwindle_record(record, loci):
     >>> dwindled_feature.type = 'rRNA'
     >>> dwindled_feature.qualifiers['gene'] = ['LSU']
     >>> s = 'atgc'*1000
-    >>> kept_record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
-    >>> kept_record.features.append(kept_feature)
-    >>> kept_record.features.append(dwindled_feature)
-    >>> print len(kept_record.features)
+    >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
+    >>> record.features.append(kept_feature)
+    >>> record.features.append(dwindled_feature)
+    >>> print(len(record.features))
     2
-    >>> a = dwindle_record(kept_record, [coi])
-    >>> print len(kept_record.features)
-    1"""
+    
+    # Dwindling the record
+    >>> a = dwindle_record(record, [coi])
+    >>> print(len(record.features))
+    1
+    """
     
     dwindled_features = []
     feature_count = 0
@@ -232,60 +330,32 @@ def dwindle_record(record, loci):
     record.features = dwindled_features
     return record
             
-           
-#def guess_format(input_filename):
-#    
-#    """ Runs a perl script that returns the input's format
-#    
-#    >>> filename = 'data/22_rotifer_COI_seqs.fas'
-#    >>> print guess_format(filename)
-#    fasta"""
-#    
-#    if os.path.exists(input_filename):
-#        os.system('perl guesser.pl ' + input_filename)
-#        guess = open(input_filename + '.format','r').read();
-#        os.remove(input_filename + '.format')
-#        return guess
-#    else:
-#        sys.exit('Cannot guess ' + input_filename + '. Does it exist?')
-      
-#def is_embl_or_gb(input_filename):
-#    
-#    """ Using the guess_format() function to check if the input conforms with
-#        embl or genbank formats.
-#    """ 
-#    
-#    input_format = guess_format(input_filename)
-#    if input_format == 'embl' or input_format == 'genbank':
-#        return True
-#    else:
-#        return False
-
+ 
+    
 def is_embl_or_gb(input_filename):
-    suffices = ['.gb','.embl']
+    suffixes = ['.gb','.embl']
     gb = False
-    for s in suffices:
+    for s in suffixes:
         if s in input_filename:
             gb = True
     return gb
 
+
+
 def parse_input(input_filename, fmt):
     return SeqIO.parse(input_filename, fmt)
 
-def generate_pickle_filename():
-    t = time.ctime(None)+'_'+str(random.random())
-    t = re.sub(' ','_',t)
-    t = re.sub(':','_',t)
-    t = re.sub('\.','_',t)
-    return t+'.pkl'
+
 
 def list_to_string(List):
     
-    """ handles list printing as a nice string
+    """
+    Handles list printing as a nice string in the db.write(format="csv") method
     
     >>> L = ['a','b','b']
-    >>> print list_to_string(L)
-    a;b;b"""
+    >>> print(list_to_string(L))
+    a;b;b
+    """
     
     string = ''
     for i in List:
@@ -295,14 +365,27 @@ def list_to_string(List):
             string += str(i)+';'
     return string[:-1]
 
+
+
+
 def lines_to_line(lines):
     
-    """ Replaces newline with space"""
+    """
+    Replaces newline with space in the db.write(format="csv") method
+    """
     
     lines = lines.split('\n')
     return (' ').join(lines)
 
+
+
+
 def type_to_single_line_str(var):
+    
+    """
+    Returns any type as a one line string for the db.write(format="csv") method
+    """
+    
     if type(var) is str and '\n' in var:
         return lines_to_line(var)
     elif type(var) is str or type(var) is int or type(var) is float:
@@ -315,7 +398,46 @@ def type_to_single_line_str(var):
         return var
 
 
+
 def get_qualifiers_dictionary(database, feature_id):
+    
+    """
+    Takes sequence record annotation, source qualifiers and feature qualifiers and puts them
+    in a flat dictionary
+    
+        
+    # Making a dummy locus    
+    >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
+    
+    # Making a dummy Database
+    >>> db = Database([coi])
+    
+    # making a dummy record
+    >>> s = 'atgc'*1000
+    >>> location = FeatureLocation(1,100)
+    >>> feature = SeqFeature()
+    >>> feature.location = location
+    >>> feature.type = 'CDS'
+    >>> feature.qualifiers['gene'] = ['CoI']
+    >>> feature.qualifiers['feature_id'] = ['12345']
+    >>> source = SeqFeature()
+    >>> source.location = FeatureLocation(0,3999)
+    >>> source.type = 'source'
+    >>> source.qualifiers['organism'] = ['Tetillda radiata']
+    >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
+    >>> record.features.append(feature)
+    >>> record.features.append(source)
+    >>> record.annotations["evidence"] = 'made up'
+    >>> db.records = [record]
+    >>> qual_dict = get_qualifiers_dictionary(db, '12345')
+    >>> qual_items = qual_dict.items()
+    >>> qual_items.sort(key = lambda i: i[0])
+    >>> for key, val in qual_items: print(key.ljust(20,' ') + val.ljust(20,' '))
+    annotation_evidence made up             
+    feature_id          12345               
+    gene                CoI                 
+    source_organism     Tetillda radiata    
+    """
     if type(feature_id) is list:
         feature_id = feature_id[0]
     record_id = feature_id.split('_')[0]
@@ -333,19 +455,34 @@ def get_qualifiers_dictionary(database, feature_id):
                         qualifiers_dictionary[qualifier]=feature.qualifiers[qualifier][0]
     return qualifiers_dictionary
 
+
+
 def seq_format_from_suffix(suffix):
-    suffices = {'fasta': ['fas','fasta','fa','fna'],
+    
+    """
+    Guesses input format from suffix
+    
+    >>> print(seq_format_from_suffix('gb'))
+    genbank
+    """
+    
+    suffixes = {'fasta': ['fas','fasta','fa','fna'],
                 'genbank': ['gb','genbank'],
                 'embl': ['embl']}
     found = False
-    for key in suffices.keys():
-        if suffix in suffices[key]:
+    for key in suffixes.keys():
+        if suffix in suffixes[key]:
             found = True
             return key
     if not found:
         raise RuntimeError(suffix+' is not a recognised suffix of an unaligned sequence file')
-        
+
+
+
+
+##############################################################################################
 class Database:
+##############################################################################################
     
 
     def __init__(self, loci):
@@ -2152,3 +2289,7 @@ def draw_trimal_scc(db, num_col, figs_folder, trimmed=False, alg = '-scc'):
     fig.savefig(figs_folder + '/' + figname +'.png')
     plt.close('all')
     return figs_folder + '/' + figname+'.png'
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
