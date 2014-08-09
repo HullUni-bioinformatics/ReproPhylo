@@ -17,7 +17,7 @@ if False:
     University of Hull
     
     
-    Dependencies:
+    Developed with:
     Python 2.7.6
     ete2 2.2rev1056
     biopython 1.64
@@ -429,6 +429,8 @@ def get_qualifiers_dictionary(database, feature_id):
     >>> record.features.append(source)
     >>> record.annotations["evidence"] = 'made up'
     >>> db.records = [record]
+    
+    # executing get_qualifiers_dictionary()
     >>> qual_dict = get_qualifiers_dictionary(db, '12345')
     >>> qual_items = qual_dict.items()
     >>> qual_items.sort(key = lambda i: i[0])
@@ -479,13 +481,42 @@ def seq_format_from_suffix(suffix):
 
 
 
+def stop_RpGit():
+    if 'RpGit' in sys.modules:  
+        del(sys.modules["RpGit"])
+
+
 
 ##############################################################################################
 class Database:
 ##############################################################################################
     
+    """
+    The Database class contians all the data and has methods to analyze it. It allows for
+    experimental analysis by running alternative analyses and formally comparing the 
+    outputs. The pickle_db() function allows to pickle the database, including sthe data,
+    intermediates and results, as well as a description of the methods.It allows for a rerun
+    of the whole analysis as is, as well as for a recongiguration of the analysis or addition
+    of data. If git is installed, it can be called by 'import RpGit'. As a result, a git repository
+    will be created in the CWD, if it doesn't already exist. Input datasets, .py, .ipynb and .pkl files
+    in the CWD will be version controlled. Version control can be paused in the middle of the script
+    by calling stop_RpGit() and restarted by importing RpGit again.
+    
+    
+    """
 
     def __init__(self, loci):
+        
+        """
+        # making dummy loci
+        >>> coi = Locus('dna','CDS','coi',['COX1','cox1'])
+        >>> ssu = Locus('dna','rRNA','18S',['18S','SSU'])
+        
+        # Making a Database object
+        >>> db = Database([coi,ssu])
+        >>> print(str(db))
+        Database object with the loci coi,18S,
+        """
         self.records = []
         self.loci = loci
         self.records_by_locus = {}
@@ -503,17 +534,19 @@ class Database:
                 raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
             else:
                 seen.append(locus.name)
+                
+    def __str__(self):
+        loci_string = ''
+        for i in self.loci:
+            loci_string += i.name+','
+        return 'Database object with the loci '+loci_string
 
     def read_embl_genbank(self, input_filenames_list):
         generators = []
         for input_filename in input_filenames_list:
             generators.append(parse_input(input_filename, 'gb'))
-#            if is_embl_or_gb(input_filename):
-#                generators.append(parse_input(input_filename, 'gb'))
-#                print 'to do: correct parse_input'
-#                print 'Accepted:', input_filename
-#            else:
-#                print ('Rejected: ' + input_filename + ' should be genbank or embl and end with .gb or .embl')
+            if not is_embl_or_gb(input_filename):
+                raise IOError('self.read_read_embl_genbank() accepts a list of filenames ending with .gb or .embl')
             for generator in generators:
                 for record in generator:
                     dwindled_record = dwindle_record(record, self.loci)
@@ -522,33 +555,6 @@ class Database:
                     elif len(record.features) == 1 and not record.features[0].type == 'source':
                         self.records.append(dwindled_record)
 
-#    def read_denovo(self, input_filename, feature_type, char_type, source_qualifiers = {}):
-#        count = 0
-#        # start the counter where it stoped the last time we read denovo things
-#        for record in self.record:
-#            if 'denovo' in record.id:
-#                serial = int(record.id[6:])
-#                if serial > count:
-#                    count = serial+1
-#        denovo = SeqIO.parse(input_filename, guess_format(input_filename))
-#        for record in denovo:
-#            feature = SeqFeature(FeatureLocation(0, len(record.seq)), type=feature_type, strand=1)
-#            source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
-#            if len(source_qualifiers.keys())>0:
-#                for key in source_qualifiers.keys():
-#                    source.qualifiers[key] = source_qualifiers[key]
-#            feature.qualifiers['original_id'] = [record.id]
-#            feature.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
-#            record.id = 'denovo'+str(count)
-#            count += 1
-#            feature.qualifiers['feature_id'] = [record.id+'_f0']
-#            source.qualifiers['feature_id'] = [record.id+'_source']
-#            record.features = [source, feature]
-#            if char_type == 'prot':
-#                record.seq.alphabet = IUPAC.protein
-#            elif char_type == 'dna':
-#                record.seq.alphabet = IUPAC.ambiguous_dna
-#            self.records.append(record)
             
     def read_denovo(self, input_filenames, char_type):
         count = 0
