@@ -1,0 +1,125 @@
+LOCUS       AM076987                2349 bp    DNA     linear   INV 15-MAR-2012
+DEFINITION  Cinachyrella levantinensis mitochondrial partial cox1 gene for
+            cytochrome c oxidase subunit I and partial putative LAGLIDADG ORF,
+            specimen voucher TAU:25456.
+ACCESSION   AM076987
+VERSION     AM076987.1  GI:114649500
+KEYWORDS    cox1 gene; cytochrome c oxidase subunit I; LAGLIDADG ORF.
+SOURCE      mitochondrion Cinachyrella levantinensis
+  ORGANISM  Cinachyrella levantinensis
+            Eukaryota; Metazoa; Porifera; Demospongiae; Tetractinomorpha;
+            Spirophorida; Tetillidae; Cinachyrella.
+REFERENCE   1
+  AUTHORS   Rot,C., Goldfarb,I., Ilan,M. and Huchon,D.
+  TITLE     Putative cross-kingdom horizontal gene transfer in sponge
+            (Porifera) mitochondria
+  JOURNAL   BMC Evol. Biol. 6, 71 (2006)
+   PUBMED   16972986
+  REMARK    Publication Status: Online-Only
+REFERENCE   2  (bases 1 to 2349)
+  AUTHORS   Huchon,D.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (27-AUG-2005) to the INSDC. Huchon D., Department of
+            Zoology, Tel Aviv University, George S. Wise Faculty of Life
+            Sciences, Ramat Aviv, Tel Aviv, 69978, ISRAEL
+FEATURES             Location/Qualifiers
+     source          1..2349
+                     /organism="Cinachyrella levantinensis"
+                     /organelle="mitochondrion"
+                     /mol_type="genomic DNA"
+                     /specimen_voucher="TAU:25456"
+                     /db_xref="taxon:878253"
+                     /country="Israel:Mediterranean Sea"
+     gene            <1..>2349
+                     /gene="cox1"
+     CDS             join(<1..672,1816..>2349)
+                     /gene="cox1"
+                     /EC_number="1.6.3.1"
+                     /codon_start=1
+                     /transl_table=4
+                     /product="cytochrome c oxidase subunit I"
+                     /protein_id="CAJ29535.2"
+                     /db_xref="GI:114649501"
+                     /db_xref="GOA:Q0E7I9"
+                     /db_xref="InterPro:IPR000883"
+                     /db_xref="InterPro:IPR023615"
+                     /db_xref="InterPro:IPR023616"
+                     /db_xref="UniProtKB/TrEMBL:Q0E7I9"
+                     /translation="TLYLLFGVFSGMIGTGFSFLIRLELSAPGSMLGDDQLYNVMVTA
+                     HGLIMVFFLVMPVMIGGFGNWLVPLYIGAPDMAFPRLNNISFWVLPPSLILLLGSAFV
+                     EQGVGTGWTLYPPLSSIQAHSGGSVDAAIFSLHLAGISSILGSMNFITTIFNMRAPGI
+                     TMDRLPLFVWSILITTYLLLLALPVLAGAVTMLLTDRNFNTTFFDPAGGGDPILFQHL
+                     FWFFGHPEVYVLILPGFGIISQIIPTFAAKKQIFGYLGMVYAMVSIGILGFIVWAHHM
+                     FTVGMDADSRAYFSAATMIIAVPTGIKIFSWIATIVGGSLRTDTPMLWAMGFVFLFTI
+                     GGLTGIVVASSSLDVLLHDTYYVVAHFHYVLSMGAIFAIFGGVYYWFGKITGYCYNEV
+                     LGKIHFWLMF"
+     exon            <1..672
+                     /gene="cox1"
+                     /number=1
+     intron          673..1815
+                     /gene="cox1"
+                     /note="group I"
+                     /number=1
+     CDS             <673..1701
+                     /gene="cox1"
+                     /note="putative LAGLIDADG ORF"
+                     /codon_start=1
+                     /transl_table=4
+                     /product="hypothetical protein"
+                     /protein_id="CAJ29536.2"
+                     /db_xref="GI:114649502"
+                     /db_xref="GOA:Q0E7I8"
+                     /db_xref="InterPro:IPR001982"
+                     /db_xref="UniProtKB/TrEMBL:Q0E7I8"
+                     /translation="LRNISGCRLILLYAGTAVSVVVHQLLVVVTIHAWYSQSAGNRSR
+                     KKVFPLLIARKIWLKKNFNHTSGLTGSSETVRKNSSLSVHCPQHSRPTIDKEFGYYLA
+                     GLIEGDGSIVISKDRAYLFICFHQKDVSTAYYIKKRLGFGSMVKQKNKKAINLTIGSR
+                     GGLLKVVNLVNGKFRTKKIESLQKLIDYLNDNNGKIEALPKDTSSVLRNHWLAGFLDA
+                     DGYFQVRILNRVRLGRKLPYEVRLHLKVDQKTKDVLNLLHEAWGGYVGYRENQDTYYY
+                     QSTGFRHALKVIRYLDRYHVLSKWLEYRQWRRVYLLVQQGIHRTEAGVEKIKKIKKMM
+                     ENMRQSEH"
+     exon            1816..>2349
+                     /gene="cox1"
+                     /number=2
+ORIGIN      
+        1 accttatact tattatttgg tgttttttcg ggtatgatag gtactggatt tagttttctt
+       61 attagattag aactatccgc tcccggatca atgttgggtg acgaccaatt atataatgtt
+      121 atggtcacgg cccatggtct tataatggtc tttttcttag ttatgccggt tatgataggt
+      181 gggtttggaa attggttggt gcccctttat attggtgcgc cggatatggc ttttccaaga
+      241 ttaaacaata ttagtttttg agttttaccc ccctcattaa tactactgtt aggttctgct
+      301 tttgttgaac aaggggttgg gacaggatga accctttatc ctccattatc aagtatacaa
+      361 gcccattctg gaggttcagt cgatgcggca atctttagtc ttcatttggc tggtatctct
+      421 tccattttag ggtcaatgaa ctttataacc actatcttta atatgcgggc accagggatt
+      481 accatggata gattgcctct atttgtttga tctattttaa taactactta cttgttatta
+      541 ttagctttgc cggtattggc tggggccgta actatgcttt taacagatag aaatttcaat
+      601 acaacgttct tcgatcccgc tgggggtgga gatccaatat tatttcaaca tttattttga
+      661 ttctttgggc atttaagaaa tatttctggg tgccgactaa ttttgctata tgctggaaca
+      721 gctgtaagtg tagtggtaca ccaactttta gttgtcgtaa caatccacgc ttgatacagc
+      781 caatcagcag gaaacagaag tcgcaagaaa gtattccctt tactaattgc aagaaagata
+      841 tgattaaaaa aaaattttaa tcatacatcg gggctaactg gttcctcaga gactgtacgc
+      901 aaaaattctt cattgtcagt gcattgtccg caacattcta gaccgaccat agataaggag
+      961 tttgggtatt atttggctgg gttgattgaa ggtgatggaa gcatagttat tagtaaagat
+     1021 agagcctatc tttttatttg ttttcatcaa aaggatgtat ctactgctta ttatattaaa
+     1081 aaacgtctag gttttggttc tatggtaaaa caaaaaaata aaaaagcaat aaaccttact
+     1141 atagggagcc gagggggcct tttaaaagta gtaaatttgg tgaatggtaa atttaggaca
+     1201 aagaaaatag aaagtttaca gaaattgata gattacctta atgataataa tgggaagatt
+     1261 gaggcattac caaaggatac ctcgtcagta ttaagaaatc attgattagc ggggtttttg
+     1321 gatgcagacg gttattttca agtgagaatt ctaaataggg tgaggttggg ccgtaaatta
+     1381 ccttatgagg ttagacttca tttaaaagta gaccaaaaaa caaaggatgt gcttaacctt
+     1441 cttcatgagg cttggggagg gtatgttgga tatcgtgaaa atcaagatac ttattattat
+     1501 caatccacag gatttcggca tgctttaaag gtaataagat atttagatcg ttatcatgtt
+     1561 ttgtctaaat ggttagagta tcggcagtgg cgtagggtgt atttattggt ccaacaaggt
+     1621 attcatagaa cagaggccgg tgtagagaag attaagaaaa ttaaaaaaat gatggagaat
+     1681 atgagacagt ccgaacatta acgtgagtta gtgagtgtta tttggtagtt aagggaatct
+     1741 accaaaacct ggattggatg atcaataccg tatgtattgt ggcgattgat ttgaaaatcc
+     1801 gggaaccaac aaatgccaga agtttatgtg ctgattttac ctgggtttgg aattatttct
+     1861 cagatcattc caacattcgc ggctaaaaaa caaatatttg gctacctagg gatggtttat
+     1921 gctatggttt ctataggaat attaggtttt atagtttgag cccatcacat gtttacagtt
+     1981 ggaatggatg ccgattctag ggcatacttt agcgctgcaa cgatgataat cgccgtacca
+     2041 accggaataa aaatctttag ttggattgct acaatagtag ggggctcatt gagaacagac
+     2101 acacctatgt tatgggctat ggggtttgtc tttttattta ctataggagg attgaccgga
+     2161 attgtggtag caagtagttc tttagatgta ttgctccacg atacatatta cgttgttgct
+     2221 cattttcatt atgtcctatc gatgggggct atctttgcta tctttggagg ggtttattat
+     2281 tgatttggta aaattactgg ttattgttac aacgaagttt taggtaaaat tcatttttga
+     2341 ttaatgttt
+//
