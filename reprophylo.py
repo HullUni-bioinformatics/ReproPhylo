@@ -34,7 +34,7 @@ if False:
 
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform#, subprocess
+import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, RpGit#, subprocess
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
@@ -46,6 +46,7 @@ from Bio.Phylo.Applications import RaxmlCommandline
 from Bio.Align import MultipleSeqAlignment
 from Bio.SeqUtils import GC
 from ete2 import *
+import __builtin__
 
 
 
@@ -111,8 +112,8 @@ class Concatenation:
     >>> loci = [coi, ssu, bssu, lsu, alg11]
     >>> concatenation = Concatenation(name='combined', loci=loci,
     ...                                otu_meta='OTU_name',
-    ...                                concat_must_have_all_of=[coi],
-    ...                                concat_must_have_one_of =[[bssu,lsu],[alg11,ssu]],
+    ...                                concat_must_have_all_of=['coi'],
+    ...                                concat_must_have_one_of =[['16S','28S'],['ALG11','18S']],
     ...                                define_trimmed_alns=["MuscleDefaults@dummyTrimMethod"])
     >>> print(str(concatenation))
     Concatenation named combined, with loci coi,18S,16S,28S,ALG11,
@@ -164,14 +165,14 @@ class Concatenation:
         loci_string = loci_string[:-1]
         must_have = ''
         for i in self.concat_must_have_all_of:
-            must_have += i.name+','
+            must_have += i+','
         must_have = must_have[:-1]
         trimmed_alignmnets_spec = ''
         one_of = ''
         for i in self.concat_must_have_one_of:
             one_of += '[ '
             for j in i:
-                one_of += j.name+' '
+                one_of += j+' '
             one_of += ']'
         if (self.define_trimmed_alns) > 0:
             for i in self.define_trimmed_alns:
@@ -193,6 +194,45 @@ if False:
     """
 ##############################################################################################
 
+
+
+__builtin__.git = False
+
+
+
+def start_git():
+    __builtin__.git = True
+    RpGit.gitInit()
+    cwd = os.getcwd()
+    import fnmatch
+    matches = []
+    for root, dirnames, filenames in os.walk(cwd):
+        for filename in fnmatch.filter(filenames, '*.py'):
+            matches.append(os.path.join(root, filename))
+        for filename in fnmatch.filter(filenames, '*.ipynb'):
+            matches.append(os.path.join(root, filename))
+    for match in matches:
+        RpGit.gitAdd(match)
+    comment = "%i script file(s) from %s" % (len(matches), time.asctime())
+    RpGit.gitCommit(comment)
+    
+    
+    
+def stop_git():
+    __builtin__.git = False
+    cwd = os.getcwd()
+    import fnmatch
+    matches = []
+    for root, dirnames, filenames in os.walk(cwd):
+        for filename in fnmatch.filter(filenames, '*.py'):
+            matches.append(os.path.join(root, filename))
+        for filename in fnmatch.filter(filenames, '*.ipynb'):
+            matches.append(os.path.join(root, filename))
+    for match in matches:
+        RpGit.gitAdd(match)
+    comment = "%i script file(s) from %s" % (len(matches), time.asctime())
+    RpGit.gitCommit(comment)
+    
 
 
 def platform_report():
@@ -269,8 +309,8 @@ def keep_feature(feature, loci):
     else:
         return False
   
-    
-    
+
+
 def dwindle_record(record, loci):
     
     """ 
@@ -481,9 +521,7 @@ def seq_format_from_suffix(suffix):
 
 
 
-def stop_RpGit():
-    if 'RpGit' in sys.modules:  
-        del(sys.modules["RpGit"])
+
 
 
 
@@ -494,15 +532,13 @@ class Database:
     """
     The Database class contians all the data and has methods to analyze it. It allows for
     experimental analysis by running alternative analyses and formally comparing the 
-    outputs. The pickle_db() function allows to pickle the database, including sthe data,
+    outputs. The pickle_db() function allows to pickle the database, including the data,
     intermediates and results, as well as a description of the methods.It allows for a rerun
-    of the whole analysis as is, as well as for a recongiguration of the analysis or addition
+    of the whole analysis as is, as well as for a reconfiguration of the analysis or addition
     of data. If git is installed, it can be called by 'import RpGit'. As a result, a git repository
     will be created in the CWD, if it doesn't already exist. Input datasets, .py, .ipynb and .pkl files
     in the CWD will be version controlled. Version control can be paused in the middle of the script
     by calling stop_RpGit() and restarted by importing RpGit again.
-    
-    
     """
 
     def __init__(self, loci):
@@ -535,18 +571,47 @@ class Database:
             else:
                 seen.append(locus.name)
                 
+                
+                
     def __str__(self):
         loci_string = ''
         for i in self.loci:
             loci_string += i.name+','
         return 'Database object with the loci '+loci_string
 
+
+
+    ###################################
+    # Database methods for reading data
+    ###################################  
+
+
+
     def read_embl_genbank(self, input_filenames_list):
+        
+        """
+        Read a file from Genbank of EMBL
+        
+        >>> input_filenames = ['data/example.gb']
+        >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+        >>> db = Database([locus])
+        >>> print(len(db.records))
+        0
+        >>> db.read_embl_genbank(input_filenames)
+        >>> print(len(db.records))
+        90
+        """
+        
+        if __builtin__.git:
+            import RpGit
+        else:
+            warnings.warn('Not controling versions')    
         generators = []
         for input_filename in input_filenames_list:
+            if __builtin__.git:
+                import RpGit
+                RpGit.gitAdd(input_filename)
             generators.append(parse_input(input_filename, 'gb'))
-            if not is_embl_or_gb(input_filename):
-                raise IOError('self.read_read_embl_genbank() accepts a list of filenames ending with .gb or .embl')
             for generator in generators:
                 for record in generator:
                     dwindled_record = dwindle_record(record, self.loci)
@@ -554,9 +619,53 @@ class Database:
                         self.records.append(dwindled_record)
                     elif len(record.features) == 1 and not record.features[0].type == 'source':
                         self.records.append(dwindled_record)
-
+        if __builtin__.git:
+            import RpGit
+            comment = "%i genbank/embl data file(s) from %s" % (len(input_filenames_list), time.asctime())
+            RpGit.gitCommit(comment)          
             
-    def read_denovo(self, input_filenames, char_type):
+        
+        
+    def read_denovo(self, input_filenames, char_type, format = 'fasta'):
+        
+        """
+        Include records from a fasta file. Fasta file records will be given record ids 
+        of the form 'denovo1'. The record.id and record.description will be placed in a
+        source feature under the 'original_id' and 'original_desc' qualifiers. Denovo sequences
+        require the use of the add_feature_to_record() method in order to be included in the
+        anaysis.
+        
+
+        >>> input_filenames = ['data/example.gb']
+        >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+        >>> db = Database([locus])
+        >>> print(len(db.records))
+        0
+        >>> db.read_embl_genbank(input_filenames)
+        >>> print(len(db.records))
+        90
+        >>> input_filenames = ['data/example_denovo.fasta']
+        >>> db.read_denovo(input_filenames, 'dna')
+        >>> print(len(db.records))
+        91
+        
+        # Since the denovo sequence has no feature it is not included
+        >>> db.extract_by_locus()
+        >>> print(len(db.records_by_locus['coi']))
+        90
+        
+        # Making a feature for the denovo record.
+        >>> db.add_feature_to_record('denovo0', 'CDS',  qualifiers={'gene': 'coi'})
+        >>> db.extract_by_locus()
+        >>> print(len(db.records_by_locus['coi']))
+        91
+        """
+        
+        if __builtin__.git:
+            import RpGit
+        else:
+            warnings.warn('Not controling versions')
+        
         count = 0
         # start the counter where it stoped the last time we read denovo things
         for record in self.records:
@@ -565,13 +674,10 @@ class Database:
                 if serial > count:
                     count = serial+1
         for input_filename in input_filenames:
-            # Check input file format
-            #suffix = re.search(r'\.([^\.]+)$',input_filename).groups()[1]
-            #input_format = seq_format_from_suffix(suffix)
-            #if input_format == 'embl' or input_format == 'genbank':
-            #    raise IOError('To read embl or genbank files use self.read_embl_genbank([filename0, filename1])')
-            #denovo = SeqIO.parse(input_filename, input_format)
-            denovo = SeqIO.parse(input_filename, 'fasta')
+            if __builtin__.git:
+                import RpGit
+                RpGit.gitAdd(input_filename)
+            denovo = SeqIO.parse(input_filename, format)
             for record in denovo:
                 source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
                 source.qualifiers['original_id'] = [record.id]
@@ -587,7 +693,39 @@ class Database:
                 count += 1
                 self.records.append(record)
                 
+        if __builtin__.git:
+            import RpGit
+            comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
+            RpGit.gitCommit(comment)
+               
+               
+               
     def add_feature_to_record(self, record_id, feature_type, location='full', qualifiers={}):
+    
+        """
+        # Making a dummy locus    
+        >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
+    
+        # Making a dummy Database
+        >>> db = Database([coi])
+    
+        # making a dummy record
+        >>> s = 'atgc'*1000
+        >>> source = SeqFeature()
+        >>> source.location = FeatureLocation(0,3999)
+        >>> source.type = 'source'
+        >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
+        >>> record.features.append(source)
+        >>> db.records = [record]
+        >>> print(len(db.records[0].features))
+        1
+        
+        # adding a feature to a record in the db
+        >>> db.add_feature_to_record('1', 'CDS', qualifiers={'gene': 'madeuplocus'})
+        >>> print(len(db.records[0].features))
+        2
+        """
+    
         for record in self.records:
             if record.id == record_id:
                 #determine new feature id
@@ -624,6 +762,9 @@ class Database:
                             list_of_locations.append(FeatureLocation(start,end,strand=strand))
                         feature = SeqFeature(CompoundLocation(list_of_locations),type=feature_type)
                 feature.qualifiers['feature_id'] = [feature_id]
+                
+                
+                
                 if len(qualifiers.keys()) > 0:
                     for key in qualifiers.keys():
                         feature.qualifiers[key] = [qualifiers[key]]
@@ -639,10 +780,63 @@ class Database:
                         raise RuntimeWarning('The translation of feature '+feature_id+' uses less than 90%'+
                                              ' of the coding sequence')
                     feature.qualifiers['translation'] = [str(translation)]
+                
+                
+                feature_seq = feature.extract(record.seq)
+                degen = len(feature_seq)
+                for i in ['A','T','G','C','U','a','t','g','c','u']:
+                    degen -= feature_seq.count(i)
+                feature.qualifiers['GC_content'] = [str(GC(feature_seq))]
+                feature.qualifiers['nuc_degen_prop'] = [str(float(degen)/len(feature_seq))]
+                if 'translation' in feature.qualifiers.keys():
+                    transl = feature.qualifiers['translation'][0]
+                    degen = 0
+                    for i in ['B', 'X', 'Z', 'b', 'x', 'z']:
+                        degen += transl.count(i)
+                    feature.qualifiers['prot_degen_prop'] = [str(float(degen)/len(transl))]   
+                
                 record.features.append(feature)
 
-    
+
+
+    ##############################################
+    # Database methods for managing concatenations
+    ##############################################  
+
+
+ 
     def add_concatenation(self, concatenation_object):
+        
+        """
+        add a Concatenation object to the Database
+        
+        # making dummy loci
+        >>> coi = Locus('dna','CDS','coi',['COX1','cox1'])
+        >>> ssu = Locus('dna','rRNA','18S',['18S','SSU'])
+        >>> lsu = Locus('dna','rRNA','28S',['28S','LSU'])
+        >>> loci = [coi,ssu,lsu]
+        
+        # making dummy Concatenation
+        >>> combined = Concatenation(name='combined', 
+        ...                          loci=loci, otu_meta='OTU_dict',
+        ...                          concat_must_have_all_of=['coi'],
+        ...                          concat_must_have_one_of =[['18S','28S']],
+        ...                          define_trimmed_alns=["MafftLinsi@Gappyout"])
+        >>> print(str(combined))
+        Concatenation named combined, with loci coi,18S,28S,
+        of which coi must exist for all species
+        and at least one of each group of [ 18S 28S ] is represented.
+        Alignments with the following names: MafftLinsi@Gappyout are prefered
+        
+        # making a dummy Database
+        >>> db = Database(loci)
+        
+        # Including the Concatenation in the Database
+        >>> db.add_concatenation(combined)
+        >>> print(len(db.concatenations))
+        1
+        """
+        
         if isinstance(concatenation_object, Concatenation):
             seen = []
             for s in self.concatenations:
@@ -656,10 +850,16 @@ class Database:
             raise TypeError("Expecting Concatenation object")
 
     def make_concatenation_alignments(self):
+        
+        """
+        Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
+        to the db.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
+        following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
+        trimmed alignment will be the Concatenation object name attribute.
+        """
         for s in self.concatenations:
             
             # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
-            
             meta = s.otu_meta
             OTU_list = []
             for record in self.records:
@@ -677,12 +877,8 @@ class Database:
                 available_features[locus.name] = []
                 for record in self.records_by_locus[locus.name]:
                     available_features[locus.name].append(record.id) # record ids are feature ids because taken from db.records_by_locus
-                    
-            
-            
-                    
+
             # make a dict of individuals that fulfil the concat's first rule
-            
             seen_locus_names = []
             included_individuals = {}
             
@@ -706,10 +902,8 @@ class Database:
                         include = False
                 if individual in included_individuals.keys() and not include:
                     included_individuals.pop(individual, None)
-                    
-                       
+                            
             # check if the individual fullfil the second set rule
-            
             for individual in included_individuals.keys():
                 include = True
                 for loci_group in s.concat_must_have_one_of:
@@ -731,10 +925,8 @@ class Database:
                         include = False
                 if not include:
                     included_individuals.pop(individual, None)
-                    
-            
+
             # add loci that are in the set but not addressed in rules
-            
             for individual in included_individuals.keys():
                 for locus in s.loci:
                     locus_specific_features = []
@@ -747,10 +939,8 @@ class Database:
                             included_individuals[individual][locus.name] = locus_specific_features[0]
                         elif len(locus_specific_features) > 1:
                             raise RuntimeError(individual + ' is not unique for ' + locus.name)
-                        
-            
+
             # build alignment
-            
             concat_records = []
             alignment = []
             keys_of_trimmed_alignments_to_use_in_concat = []
@@ -796,10 +986,30 @@ class Database:
             self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
             s.feature_id_dict = included_individuals    
 
-   
+
+
+    ###################################################
+    # Database methods for modifying feature qualifiers
+    ###################################################
+
 
 
     def write(self, filename, format = 'genbank'):
+        
+        """
+        Write the records in the database in any Biopython format, as csv or as nexml.
+        
+        The csv table has a line for each feature (ie multiplt lines for records
+        with multiple non-source featue). Each line will include the records annotations,
+        the source feature qualifiers and the qualifiers of the feature itself. (ie, in a
+        record with several features, the record annotations and the source feature qualifiers
+        will be repeted in several lines, once for each non-source feature in the record.
+        The csv file is primarily usefull for reviewing and editing feature qualifiers
+        
+        The nexml format only includes the trees from the db.trees dictionary, but all 
+        the metadata is included as leaf metadata, including the sequences and the
+        trimmed and alligned sequences for each leaf.
+        """
         if format == 'nexml':
             self.write_nexml(filename)
         elif format == 'genbank' or format == 'embl':
@@ -867,6 +1077,93 @@ class Database:
 
                 
     def if_this_then_that(self, IF_THIS, IN_THIS, THEN_THAT, IN_THAT, mode = 'whole'):
+        
+        
+        """
+        Searches db.records for features that have the value IF_THIS in the qualifier IN_THIS
+        and places the value THEN_THAT in the qualifier IN_THAT, which either exists or is new.
+        
+        The IF_THIS value can either match completely (mode = 'whole') or just to a part (mode = 'part')
+        of the target qualifier value
+        
+        The following demonstartes all the feature qualifier editing methods
+        
+        # Make a dummy db with a locus and with records
+        >>> input_filenames = ['data/example.gb']
+        >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+        >>> db = Database([locus])
+        >>> db.read_embl_genbank(input_filenames)
+        
+        # copying a source qualifier into the feature qualifiers so that it
+        # will be available for editing (source qualifiers are kept imutable)
+        >>> db.add_qualifier_from_source('organism')
+        
+        # populate a new qualifier based on the data in another
+        # Here we will take only the the genus name from the organism qualifier
+        # and put it in a new qualifier
+        # We use mode='part' because our search phrase (the genus name)
+        # fits only the start of the organism name
+        >>> tetillid_genera = ['Tetilla', 'Cinachyrella', 'Craniella']
+        >>> for g in tetillid_genera:
+        ...     db.if_this_then_that(g, 'organism', g, 'genus', mode='part')
+        
+        # Now we will add a sample id to all the sequences which belong to
+        # sample TAU_25617
+        >>> db.add_qualifier(['JX177913.1_f0',
+        ...                  'JX177935.1_f0',
+        ...                  'JX177965.1_f0'],
+        ...                  'specimen_voucher',
+        ...                  'TAU_25617')
+    
+        # We are using a copy paste approch to unite the data from 
+        # differen qualifiers under on qualifiers
+        >>> db.copy_paste_within_feature('variant', 'strain_or_variant')
+        >>> db.copy_paste_within_feature('strain', 'strain_or_variant')
+        
+        # Now we print the qualifier of a random feature as an example
+        >>> qual_dict = get_qualifiers_dictionary(db, 'JX177913.1_f0')
+        >>> qual_items = qual_dict.items()
+        >>> qual_items.sort(key = lambda i: i[0])
+        >>> for key, val in qual_items:
+        ...     print(key.ljust(40,' ') + type_to_single_line_str(val)[:5]+'...')
+        GC_content                              37.28...
+        annotation_accessions                   JX177...
+        annotation_data_file_division           INV...
+        annotation_date                         05-SE...
+        annotation_gi                           39293...
+        annotation_keywords                     ...
+        annotation_organism                     Cinac...
+        annotation_references                   locat...
+        annotation_sequence_version             1...
+        annotation_source                       mitoc...
+        annotation_taxonomy                     Eukar...
+        codon_start                             2...
+        db_xref                                 GI:39...
+        feature_id                              JX177...
+        gene                                    cox1...
+        genus                                   Cinac...
+        nuc_degen_prop                          0.0...
+        organism                                Cinac...
+        product                                 cytoc...
+        prot_degen_prop                         0.0...
+        protein_id                              AFM91...
+        source_country                          Panam...
+        source_db_xref                          taxon...
+        source_feature_id                       JX177...
+        source_identified_by                    Ilan,...
+        source_mol_type                         genom...
+        source_note                             autho...
+        source_organelle                        mitoc...
+        source_organism                         Cinac...
+        source_specimen_voucher                 DH_S2...
+        specimen_voucher                        TAU_2...
+        transl_table                            4...
+        translation                             MIGSG...
+        
+        # Note that GC content and the porportion of degenerate positions
+        # have been automatically included. They will be plotted in the report
+        """
+        
         for record in self.records:
             for feature in record.features:
                 if not feature.type == 'source':
@@ -882,6 +1179,7 @@ class Database:
                                     feature.qualifiers[IN_THAT] = [THEN_THAT]
     
 
+
     def add_qualifier(self, feature_ids, name, value):
         if not type(value) is list:
                     value = [value]
@@ -889,6 +1187,8 @@ class Database:
             for feature in record.features:
                 if feature.qualifiers['feature_id'][0] in feature_ids:
                     feature.qualifiers[name] = value
+
+
 
     def add_qualifier_from_source(self, qualifier):
         for record in self.records:
@@ -908,13 +1208,16 @@ class Database:
                         feature.qualifiers[qualifier] = value
     
 
+
     def copy_paste_within_feature(self, from_qualifier, to_qualifier):
         for record in self.records:
             for feature in record.features:
                 if not feature.type == 'source':
                     if from_qualifier in feature.qualifiers.keys():
                         feature.qualifiers[to_qualifier] = feature.qualifiers[from_qualifier]
-                   
+                  
+                        
+                        
     def copy_paste_from_features_to_source(self, from_feature_qual, to_source_qual):
         for record in self.records:
             source = None
@@ -933,7 +1236,15 @@ class Database:
             if not to_source_qual in source.qualifiers.keys():
                 source.qualifiers[to_source_qual] = values_from_features
            
+                
+                
     def species_vs_loci(self, outfile_name):
+        
+        """
+        Makes a csv file showing the count of each unique value in the source_organism qualifier
+        for each locus
+        """
+        
         species_vs_loci = {}
         for record in self.records:
             organism = 'undef'
@@ -976,10 +1287,31 @@ class Database:
                     else:
                         line.append('0')
                 linewriter.writerow(line)
-                    
-            
+                
+                
+                
+    ######################################                
+    # Database methods to analyze the data
+    ######################################
+    
+    
         
     def extract_by_locus(self):
+        
+        """
+        
+        >>> input_filenames = ['data/example.gb']
+        >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+        >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
+        >>> db = Database([coi, lsu])
+        >>> db.read_embl_genbank(input_filenames)
+        >>> db.extract_by_locus()
+        >>> print(len(db.records_by_locus['coi']))
+        90
+        >>> print(len(db.records_by_locus['28S']))
+        48
+        """
+        
         data_by_locus = {}
         for locus in self.loci:
             if not locus.name in locus.aliases:
@@ -1007,13 +1339,26 @@ class Database:
         self.records_by_locus = data_by_locus
 
 
+
     def write_by_locus(self, format = 'fasta'):
+        
+        """
+        Write the unaligned sequences into file in any Biopython format, one file per locus
+        """
+        
         if self.records_by_locus == {}:
             self.extract_by_locus
         for key in self.records_by_locus.keys():
             SeqIO.write(self.records_by_locus[key], key+'.'+format, format)
-            
+
+
+
     def align(self, alignment_methods=[], pal2nal='./pal2nal.pl'):
+        
+            """
+            Configured by an AlignmentMethod object
+            """
+
             seen_loci = []
             for method in alignment_methods:
                 method.timeit.append(time.time())
@@ -1069,21 +1414,27 @@ class Database:
                 for f in method_files:
                     os.remove(f)
             self.used_methods += alignment_methods
-            
+
+
+
     def write_alns(self, format = 'fasta'):
         if len(self.alignments.keys()) == 0:
             raise IOError('Align the records first')
         else:
             for key in self.alignments:
                 AlignIO.write(self.alignments[key], key+'_aln.'+format, format)
-                
+
+
+
     def write_trimmed_alns(self, format = 'fasta'):
         if len(self.trimmed_alignments.keys()) == 0:
             raise IOError('Align and trimmed the records first')
         else:
             for key in self.trimmed_alignments.keys():
                 AlignIO.write(self.trimmed_alignments[key], key+'_trimmed_aln.'+format, format)
-            
+
+
+
     def tree(self, raxml_methods):
         # to do: determine the program used and the resulting expected tree file name
         
@@ -1162,12 +1513,16 @@ class Database:
                         if raxml_method.id.partition('_')[0] in file_name:
                             os.remove(file_name)
         self.used_methods += raxml_methods
-        
+
+
+
     def clear_tree_annotations(self):
         for tree in self.trees.keys():
             t = Tree(self.trees[tree][1])
             t.dist = 0
             self.trees[tree][0] = t
+
+
 
     def write_nexml(self, output_name):
         D = dendropy.DataSet()
@@ -1214,21 +1569,6 @@ class Database:
             tree_list.append(tree)
         TL = dendropy.TreeList(tree_list)    
         D.add_tree_list(TL)
-        
-        #for aln_name in self.alignments.keys():
-        #    if aln_name in loci_names:
-        #        char_type = ''
-        #        matrix = None
-        #        for locus in self.loci:
-        #            if locus.name == aln_name:
-        #                char_type = locus.char_type
-        #        if char_type == 'dna':
-        #            matrix = dendropy.DnaCharacterMatrix()
-        #        elif char_type == 'prot':
-        #            matrix = dendropy.ProteinCharacterMatrix()
-        #        matrix_string = self.alignments[aln_name].format('fasta')
-        #        matrix.read_from_string(matrix_string,'fasta')
-        #        D.add_char_matrix(matrix)
             
         D.write_to_path(
             output_name,
@@ -1273,15 +1613,6 @@ class Database:
                     ts.legend.add_face(TextFace(' '+str(node_support_dict[color][0])+'-'+str(node_support_dict[color][1]),
                                                 fsize=10), column=i)
                     i += 1
-            
-            #if heat_map_meta:
-            #    ts.legend_position=1
-            #    ts.legend.add_face(TextFace('Heatmap columns: ', fsize=10), column=0)
-            #    i = 1
-            #    for meta in heat_map_meta:
-            #        ts.legend.add_face(TextFace(' '+str(meta)+', ',
-            #                                    fsize=20), column=i)
-            #        i += 1
                 
             for tree in self.trees.keys():
                                        
@@ -1391,6 +1722,8 @@ class Database:
             print '</html>'
             print fig_folder
 
+
+
     def trim(self):
         for aln in self.alignments.keys():
             AlignIO.write(self.alignments[aln],aln+'_aln.fasta','fasta')
@@ -1400,8 +1733,21 @@ class Database:
                 record.description = ''
             self.trimmed_alignments[aln+'@'+'dummyTrimMethod'] = align
             
-            
+
+
+##############################################################################################
 class AlignmentMethod:
+##############################################################################################
+    
+    """
+    >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
+    >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
+    >>> db = Database([coi, lsu])
+    
+    # cline_str = muscle = AlignmentMethod(db, method_name='MuscleDefaults',
+    #                                      cmd='muscle', program_name='muscle',
+    #                                     cline_args=dict())
+    """
     
     def __init__(self, db, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
                  cmd='mafft', loci='all',
@@ -1509,6 +1855,9 @@ class AlignmentMethod:
             for c in cline.keys():
                 self.command_lines[locus.name].__setattr__(c,cline[c])
             print str(self.command_lines[locus.name])
+            
+            
+            
     def __str__(self):
         loci_string = ''
         for n in [i.name for i in self.loci]:
@@ -1520,19 +1869,15 @@ class AlignmentMethod:
         date = str(self.timeit[0])
         execution = str(self.timeit[3])
         plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return """
-AlignmentMethod named %s with ID %s         
-Loci: %s        
-Executed on: %s
-
-Commands:
-%s
-
-Environment:    
-%s
-
-execution time:
-%s""" %(self.method_name, str(self.id), loci_string, date, command_lines, plat,execution)  
+        return ("AlignmentMethod named %s with ID %s",         
+                "Loci: %s ",       
+                "Executed on: %s",
+                "Commands:",
+                "%s",
+                "Environment:",    
+                "%s",
+                "execution time:",
+                "%s" %(self.method_name, str(self.id), loci_string, date, command_lines, plat,execution))  
 
 
 
@@ -2082,6 +2427,12 @@ def pickle_db(db, pickle_file_name):
         output = open(pickle_file_name,'wb')
         pickle.dump(db, output)
         output.close()
+        if __builtin__.git:
+            import RpGit
+            RpGit.gitAdd(pickle_file_name)
+            comment = "A pickled Database from %s" % time.asctime()
+            RpGit.gitCommit(comment) 
+            
         return pickle_file_name
     
 def unpickle_db(pickle_file_name):
