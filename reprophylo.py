@@ -25,6 +25,8 @@ if False:
     cloud 2.8.5
     
     RAxML 8
+    Phylobayes
+    Trimal
     Muscle
     Mafft
     Pal2nal
@@ -35,6 +37,7 @@ if False:
 
 from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, RpGit#, subprocess
+import subprocess as sub
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
@@ -605,7 +608,7 @@ class Database:
         if __builtin__.git:
             import RpGit
         else:
-            warnings.warn('Not controling versions')    
+            warnings.warn('Version control off')    
         generators = []
         for input_filename in input_filenames_list:
             if __builtin__.git:
@@ -664,7 +667,7 @@ class Database:
         if __builtin__.git:
             import RpGit
         else:
-            warnings.warn('Not controling versions')
+            warnings.warn('Version control off')
         
         count = 0
         # start the counter where it stoped the last time we read denovo things
@@ -1356,7 +1359,7 @@ class Database:
     def align(self, alignment_methods=[], pal2nal='./pal2nal.pl'):
         
             """
-            Configured by an AlignmentMethod object
+            Configured by an AlnConf object
             """
 
             seen_loci = []
@@ -1369,7 +1372,7 @@ class Database:
                     method.platform.append('Program and version: Get mafft to spit version to stdout')
                 for locus in method.loci:
                     if locus.name in seen_loci:
-                        #raise RuntimeError('locus '+locus.name+' is in more than one AlignmentMethod objects')
+                        #raise RuntimeError('locus '+locus.name+' is in more than one AlnConf objects')
                         pass
                     else:
                         seen_loci.append(locus.name)
@@ -1634,7 +1637,7 @@ class Database:
                                 fgcolor = leaf_label_colors[colour_name]
                     leaf_face = TextFace(leaf_label, fgcolor=fgcolor)
                     leaf.add_face(leaf_face,0)
-                    if not root_value == 'mid' and root_value in qualifiers_dictionary[root_meta]:
+                    if not root_value == 'mid' and root_meta in qualifiers_dictionary.keys() and root_value in qualifiers_dictionary[root_meta]:
                         outgroup_list.append(leaf)
                         
                     if heat_map_meta:
@@ -1724,19 +1727,37 @@ class Database:
 
 
 
-    def trim(self):
-        for aln in self.alignments.keys():
-            AlignIO.write(self.alignments[aln],aln+'_aln.fasta','fasta')
-            stdout = os.popen('trimal -in '+ aln +'_aln.fasta -gappyout').read()
-            align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.ambiguous_dna)
-            for record in align:
-                record.description = ''
-            self.trimmed_alignments[aln+'@'+'dummyTrimMethod'] = align
+#    def trim(self):
+#        for aln in self.alignments.keys():
+#            AlignIO.write(self.alignments[aln],aln+'_aln.fasta','fasta')
+#            stdout = os.popen('trimal -in '+ aln +'_aln.fasta -gappyout').read()
+#            align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.ambiguous_dna)
+#            for record in align:
+#                record.description = ''
+#            self.trimmed_alignments[aln+'@'+'dummyTrimMethod'] = align
+            
+    def trim(self, list_of_Conf_objects):
+        for m in list_of_Conf_objects:
+            if isinstance(m, TrimalConf):
+                import subprocess as sub
+                for aln in m.command_lines.keys():
+                    p = sub.Popen(m.command_lines[aln], shell=True, stdout=sub.PIPE)
+                    stdout, stderr = p.communicate()
+                    #stdout = os.system(m.command_lines[aln]).stdout
+                    alphabet = IUPAC.ambiguous_dna
+                    locus_name = aln.split('@')[0]
+                    for locus in self.loci:
+                        if locus.name == locus_name and locus.char_type == 'prot':
+                            alphabet = IUPAC.protein
+                    self.trimmed_alignments[aln] = AlignIO.read(StringIO(stdout), "fasta",  alphabet=alphabet)
+            for file_name in os.listdir(os.curdir):
+                        if m.id.partition('_')[0] in file_name:
+                            os.remove(file_name)
             
 
 
 ##############################################################################################
-class AlignmentMethod:
+class AlnConf:
 ##############################################################################################
     
     """
@@ -1744,7 +1765,7 @@ class AlignmentMethod:
     >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
     >>> db = Database([coi, lsu])
     
-    # cline_str = muscle = AlignmentMethod(db, method_name='MuscleDefaults',
+    # cline_str = muscle = AlnConf(db, method_name='MuscleDefaults',
     #                                      cmd='muscle', program_name='muscle',
     #                                     cline_args=dict())
     """
@@ -1776,7 +1797,7 @@ class AlignmentMethod:
         for key in db.records_by_locus.keys():
             SeqIO.write(db.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
         for locus in self.loci:
-            # put default input file filename and string in the AlignmentMethod object
+            # put default input file filename and string in the AlnConf object
             input_filename=self.id+'_'+locus.name+'.fasta'
             self.aln_input_strings[locus.name] = [open(input_filename,'r').read()]
             # If CDS prepare reference protein input file and in frame CDS input file
@@ -1814,7 +1835,7 @@ class AlignmentMethod:
                             # make protein record
                             feature_record = SeqRecord(seq = P, id = feature.qualifiers['feature_id'][0],
                                                        description = '')
-                            # Put the protein records in the AlignmentMethod object
+                            # Put the protein records in the AlnConf object
                             self.CDS_proteins[locus.name].append(feature_record)
                            
                                     
@@ -1869,7 +1890,7 @@ class AlignmentMethod:
         date = str(self.timeit[0])
         execution = str(self.timeit[3])
         plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return ("AlignmentMethod named %s with ID %s",         
+        return ("AlnConf named %s with ID %s",         
                 "Loci: %s ",       
                 "Executed on: %s",
                 "Commands:",
@@ -1879,6 +1900,47 @@ class AlignmentMethod:
                 "execution time:",
                 "%s" %(self.method_name, str(self.id), loci_string, date, command_lines, plat,execution))  
 
+##############################################################################################
+class TrimalConf:
+##############################################################################################
+    def __init__(self, db, method_name='gappyout', program_name='trimal',
+                 cmd='trimal', alns='all', trimal_commands=dict(gappyout=True)):
+        
+        self.id = str(random.randint(10000,99999))+str(time.time())
+        self.method_name=method_name
+        self.program_name=program_name
+        self.alignments = db.alignments
+        if not alns == 'all':
+            self.alignments = {}
+            for aln_name in alns:
+                if aln_name in db.alignments.keys():
+                    self.alignments[aln_name] = db.alignments[aln_name]
+        self.command_lines = {}
+        self.timeit = [time.asctime()]
+        self.platform = []
+        self.cmd = cmd
+        irelevant = ['out', 'clustal', 'fasta', 'nbrf', 'nexus', 'mega',
+                     'phylip3.2', 'phylip', 'sgt', 'scc', 'sct', 'sfc',
+                     'sft','sident']
+        for aln in self.alignments:
+            input_filename = self.id+'_'+aln+'.fasta'
+            AlignIO.write(self.alignments[aln], input_filename,'fasta')
+            self.command_lines[aln] = "%s -in %s "%(self.cmd, input_filename)
+            for kwd in trimal_commands:
+                if kwd in irelevant:
+                    warnings.simplefilter('always')
+                    warnings.warn("%s is irelevant in this context and will be ignored"%kwd)
+                else:
+                    if not trimal_commands[kwd] == None and not trimal_commands[kwd] == False:
+                        if trimal_commands[kwd] == True:
+                            self.command_lines[aln] += "-%s "%(kwd)
+                        else:
+                            self.command_lines[aln] += "-%s %s "%(kwd, trimal_commands[kwd])
+            
+            self.command_lines[aln+'@'+self.method_name] = self.command_lines[aln][:-1]
+            print self.command_lines[aln+'@'+self.method_name]
+            self.command_lines.pop(aln, None)
+        
 
 
 def use_sh_support_as_branch_support(tree_filename):
@@ -2052,7 +2114,8 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
                 presets[preset][cline] = dict({'-q': partfile}, **presets[preset][cline])               
     return presets[tree_method.preset] 
 
-class RaxmlTreeReconstructionMethod:
+
+class RaxmlConf:
     
     
     def __init__(self, db, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
@@ -2286,14 +2349,14 @@ def report_methods(db, figs_folder):
         
         
         for method in db.used_methods:
-            if method[0] == 'AlignmentMethod' or method[0] == 'RaxmlTreeReconstructionMethod':
+            if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf'):
                 title = method[0]
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 for i in method[1:]:
                     report_lines.append('<strong>'+str(i[0])+'</strong>')
                     report_lines.append(str(i[1]).replace(',','<br>'))
             
-            elif isinstance(method, AlignmentMethod):
+            elif isinstance(method, AlnConf):
                 title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 #--------------------------------------------------------
@@ -2313,7 +2376,7 @@ def report_methods(db, figs_folder):
                     report_lines.append(str(method.command_lines[cline]))
                     report_lines.append('</pre>')
                     
-            elif isinstance(method, RaxmlTreeReconstructionMethod):
+            elif isinstance(method, RaxmlConf):
                 title = 'Raxml Tree Reconstruction Method \"'+method.method_name+'\", method ID: '+method.id
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 #--------------------------------------------------------
@@ -2452,7 +2515,7 @@ def unpickle_db(pickle_file_name):
            setattr(new_db,attr_name,getattr(pkl_db,attr_name))
             
         for i in pkl_db.used_methods:
-            if isinstance(i, list) and (i[0] == 'AlignmentMethod' or i[0] == 'RaxmlTreeReconstructionMethod'):
+            if isinstance(i, list) and (i[0] == 'AlnConf' or i[0] == 'RaxmlConf' or i[0] == 'TrimalConf'):
                 new_db.used_methods.append(i)
             else:
                 
@@ -2461,6 +2524,7 @@ def unpickle_db(pickle_file_name):
                            'CDSAlign',
                            'program_name',
                            'loci',
+                           'alns'
                            'command_lines',
                            'timeit',
                            'platform',
@@ -2470,10 +2534,12 @@ def unpickle_db(pickle_file_name):
                            'trimmed_alignments']
             
                 method_list = []
-                if isinstance(i, AlignmentMethod):
-                    method_list.append('AlignmentMethod')
-                elif isinstance(i, RaxmlTreeReconstructionMethod):
-                    method_list.append('RaxmlTreeReconstructionMethod')
+                if isinstance(i, AlnConf):
+                    method_list.append('AlnConf')
+                elif isinstance(i, RaxmlConf):
+                    method_list.append('RaxmlConf')
+                elif isinstance(i, TrimalConf):
+                    method_list.append('TrimalConf')
                 for attr in include:
                     if attr in dir(i):
                         method_list.append([attr, str(getattr(i,attr))])
@@ -2534,14 +2600,14 @@ def calc_rf(db, figs_folder):
 
     for t1 in trees:
         line = []
-        dupT1 = db.trees[t1][0].copy()
+        dupT1 = Tree(db.trees[t1][0].write())
         for l in dupT1:
             for record in db.records:
                 for feature in record.features:
                     if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                         l.name = feature.qualifiers[meta][0]
         for t2 in trees:
-            dupT2 = db.trees[t2][0].copy()
+            dupT2 = Tree(db.trees[t2][0].write())
             for l in dupT2:
                 for record in db.records:
                     for feature in record.features:
