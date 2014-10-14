@@ -565,15 +565,39 @@ class Database:
         self.trees = {}
         self.used_methods = []
         seen = []
-        for locus in loci:
-            if not isinstance(locus, Locus):
-                raise TypeError("Expecting Locus object in loci list. "+locus+
-                                " not a Locus object")
-            if locus.name in seen:
-                raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
+        if isinstance(loci,list):
+            for locus in loci:
+                if not isinstance(locus, Locus):
+                    raise TypeError("Expecting Locus object in loci list. "+locus+
+                                    " not a Locus object")
+                if locus.name in seen:
+                    raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
+                else:
+                    seen.append(locus.name)
+        elif isinstance(loci,str):
+            if any(len(line.split(',')) >= 4 for line in open(loci, 'r').readlines()):
+                pass
             else:
-                seen.append(locus.name)
+                raise IOError("File %s has no valid loci of format char_type,feature_type,name,aliases"%loci)
                 
+                
+            loci_list = []
+            
+            for line in [line.rstrip() for line in open(loci, 'r').readlines() if len(line.rstrip()) > 0]:
+                if len(line.split(',')) < 4:
+                    raise IOError("The line %s in file %s is missing arguments. Needs at least char_type,feature_type,name,aliases"%
+                                  (line.rstrip(), loci))
+                else:
+                    char_type = line.split(',')[0]
+                    feature_type = line.split(',')[1]
+                    name = line.split(',')[2]
+                    alises = line.split(',')[3:]
+                    loci_list.append(Locus(char_type,feature_type,name,alises))
+            self.loci = loci_list
+            print 'Read the following loci from file %s:'%loci
+            for l in self.loci:
+                print str(l)
+     
                 
                 
     def __str__(self):
@@ -1353,6 +1377,7 @@ class Database:
                     subset = []
                     locus_feature_ids = [i.id.split('_')[0] for i in self.records_by_locus[key]]
                     if not all(i.split('_')[0] in locus_feature_ids for i in value):
+                        print [i.split('_')[0] for i in value if not i.split('_')[0] in locus_feature_ids]
                         warnings.warn('Not all records to exclude exist in locus. Typos?')
                     if start_from_max:
                         for record in keep_safe[key]:
