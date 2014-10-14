@@ -1341,6 +1341,64 @@ class Database:
             data_by_locus[locus.name] = records
         self.records_by_locus = data_by_locus
 
+    def exclude(self, start_from_max=True, **kwargs):
+        keep_safe = self.records_by_locus
+        self.extract_by_locus()
+        locus_names = [i.name for i in self.loci]
+        for key, value in kwargs.iteritems():
+            if key in locus_names:
+                if value == 'all':
+                    self.records_by_locus[key] = []
+                else:
+                    subset = []
+                    locus_feature_ids = [i.id.split('_')[0] for i in self.records_by_locus[key]]
+                    if not all(i.split('_')[0] in locus_feature_ids for i in value):
+                        warnings.warn('Not all records to exclude exist in locus. Typos?')
+                    if start_from_max:
+                        for record in keep_safe[key]:
+                            if not record.id.split('_')[0] in [i.split('_')[0] for i in value]:
+                                subset.append(record)
+                        self.records_by_locus[key] = subset
+                    else:
+                        for record in self.records_by_locus[key]:
+                            if not record.id.split('_')[0] in [i.split('_')[0] for i in value]:
+                                subset.append(record)
+                        self.records_by_locus[key] = subset
+            else:
+                warnings.warn('Locus name %s not recognised'%key)
+
+    def include(self, start_from_null=True, **kwargs):
+        keep_safe = self.records_by_locus
+        self.extract_by_locus()
+        locus_names = [i.name for i in self.loci]
+        for key, value in kwargs.iteritems():
+            if key in locus_names:
+                if value == 'all':
+                    pass
+                else:
+                    subset = []
+                    locus_feature_ids = [i.id.split('_')[0] for i in self.records_by_locus[key]]
+                    if not all(i.split('_')[0] in locus_feature_ids for i in value):
+                        print [i.split('_')[0] for i in value if not i.split('_')[0] in locus_feature_ids]
+                        warnings.warn('Not all records to include exist in locus. Typos?')
+                    for record in self.records_by_locus[key]:
+                        if record.id.split('_')[0] in [i.split('_')[0] for i in value]:
+                            subset.append(record)
+                    self.records_by_locus[key] = subset
+                    if not start_from_null:
+                        self.records_by_locus[key] = subset+keep_safe[key]
+            else:
+                warnings.warn('Locus name %s not recognised'%key)
+
+    def filter_by_seq_length(self, min_length=0, max_length=None):
+        if self.records_by_locus == {}:
+            self.extract_by_locus()
+        for key in self.records_by_locus.keys():
+            subset = [r for r in self.records_by_locus[key] if len(r) >= min_length]
+            if max_length:
+                subset = [r for r in subset if len(r) <= max_length]
+            self.records_by_locus[key] = subset
+                
 
 
     def write_by_locus(self, format = 'fasta'):
@@ -2640,7 +2698,7 @@ def calc_rf(db, figs_folder):
     ax.set_xticklabels(row_labels, minor=False, size=14, rotation='vertical')
     ax.set_yticklabels(column_labels, minor=False, size=14)
     #fig.set_size_inches(12.5,12.5)
-    
+    fig.colorbar(heatmap, cmap=plt.cm.Blues)
     name = str(random.randint(1000,2000))
     fig.savefig(figs_folder + '/' + name +'.png')
     close('all')
