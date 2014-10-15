@@ -524,7 +524,43 @@ def seq_format_from_suffix(suffix):
 
 
 
+def read_feature_quals_from_tab_csv(csv_filename):
+    import re
+    header = open(csv_filename, 'r').readlines()[0].rstrip().split('\t')
+    feature_id_col = header.index('feature_id')
+    taxonomy_col = header.index('taxonomy')
+    seq_col = header.index('seq')
+    translation_col = None
+    if 'translation' in header:
+        translation_col = header.index('translation')
+    csv_info = {}
+    for line in [l.rstrip().split('\t') for l in open(csv_filename, 'r').readlines()[1:]]:
+        if not line[0] in csv_info.keys():
+            csv_info[line[0]] = {'source':{},
+                                 'taxonomy':[],
+                                 'features':{}
+                                 }
+        if csv_info[line[0]]['taxonomy'] == []:
+            csv_info[line[0]]['taxonomy'] = line[taxonomy_col].split(';')
+        csv_info[line[0]]['features'][line[feature_id_col]] = {}
+        get_source = False
+        if csv_info[line[0]]['source'] == {}:
+            get_source = True
+        for i in range(len(header)):
+            if get_source and 'source:_' in header[i]:
+                qual_name = re.sub('source:_','',header[i])
+                if not line[i] == 'null' and not line[i] == '':
+                    csv_info[line[0]]['source'][qual_name] = line[i].split(';')
+            elif (not 'source:_' in header[i] and not line[i] == 'null' and not line[i] == '' and
+                  not i in [seq_col, translation_col, taxonomy_col, feature_id_col]):
+                csv_info[line[0]]['features'][line[feature_id_col]][header[i]] = line[i].split(';')
+    return csv_info
 
+                
+            
+                
+            
+            
 
 
 
@@ -1057,7 +1093,7 @@ class Database:
                 linewriter = csv.writer(csvfile, delimiter='\t',
                                         quotechar='|',
                                         quoting=csv.QUOTE_MINIMAL)
-                linewriter.writerow(['record_id','seq']+source_qualifiers+['taxonomy']+feature_qualifiers)
+                linewriter.writerow(['record_id','seq']+['source:_'+q for q in source_qualifiers]+['taxonomy']+feature_qualifiers)
                 for record in self.records:
                     seq = ''
                     if len(record.seq) <= 10:
@@ -1100,8 +1136,24 @@ class Database:
                                     line.append('null')
                             linewriter.writerow(line)
 
-                            
-
+    def correct_metadata_from_file(self,csv_file):
+        metadata = read_feature_quals_from_tab_csv(csv_file)
+        for record in self.records:
+            record_corrected_metadata = metadata[record.id]
+            record.annotations['taxonomy'] = metadata[record.id]['taxonomy']
+            for feature in record.features:
+                if feature.type == 'source':
+                    feature.qualifiers = metadata[record.id]['source']
+                else:
+                    feature_id = feature.qualifiers['feature_id']
+                    translation = None
+                    if 'translation' in feature.qualifiers.keys():
+                        translation = feature.qualifiers['translation']
+                    feature.qualifiers = metadata[record.id]['features'][feature_id[0]]
+                    feature.qualifiers['feature_id'] = feature_id
+                    if translation:
+                        feature.qualifiers['translation'] = translation
+                
                 
     def if_this_then_that(self, IF_THIS, IN_THIS, THEN_THAT, IN_THAT, mode = 'whole'):
         
