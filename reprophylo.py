@@ -176,7 +176,7 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
 class Locus:
 ##############################################################################################
 
-    """ Configure the loci stored in the ReproPhylo DB.
+    """ Configure the loci stored in the ReproPhylo Project.
         
     >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
     >>> print(locus)
@@ -310,9 +310,9 @@ class Concatenation:
 ##############################################################################################
 if False:
     """
-    Reprophylo Database Utilities
+    Reprophylo Project Utilities
     
-    Used in the Database class but are not in the classes methods
+    Used in the Project class but are not in the classes methods
     """
 ##############################################################################################
 
@@ -381,16 +381,16 @@ def platform_report():
 
 
 
-def write_alns(db, format = 'fasta'):
+def write_alns(pj, format = 'fasta'):
     """
-    Writes untrimmed sequence alignment files that are in db in a biopython format
+    Writes untrimmed sequence alignment files that are in pj in a biopython format
     """
     
-    if len(db.alignments.keys()) == 0:
+    if len(pj.alignments.keys()) == 0:
         raise IOError('Align the records first')
     else:
-        for key in db.alignments:
-            AlignIO.write(db.alignments[key], key+'_aln.'+format, format)
+        for key in pj.alignments:
+            AlignIO.write(pj.alignments[key], key+'_aln.'+format, format)
 
 
 
@@ -407,7 +407,7 @@ def keep_feature(feature, loci):
     >>> feature.type = 'CDS'
     >>> feature.qualifiers['gene'] = ['CoI']
     
-    # testing if fits any of the Database Locus objects
+    # testing if fits any of the Project Locus objects
     >>> a = keep_feature(feature, [coi])
     >>> print(a)
     True"""
@@ -512,7 +512,7 @@ def parse_input(input_filename, fmt):
 def list_to_string(List):
     
     """
-    Handles list printing as a nice string in the db.write(format="csv") method
+    Handles list printing as a nice string in the pj.write(format="csv") method
     
     >>> L = ['a','b','b']
     >>> print(list_to_string(L))
@@ -533,7 +533,7 @@ def list_to_string(List):
 def lines_to_line(lines):
     
     """
-    Replaces newline with space in the db.write(format="csv") method
+    Replaces newline with space in the pj.write(format="csv") method
     """
     
     lines = lines.split('\n')
@@ -545,7 +545,7 @@ def lines_to_line(lines):
 def type_to_single_line_str(var):
     
     """
-    Returns any type as a one line string for the db.write(format="csv") method
+    Returns any type as a one line string for the pj.write(format="csv") method
     """
     
     if type(var) is str and '\n' in var:
@@ -561,7 +561,7 @@ def type_to_single_line_str(var):
 
 
 
-def get_qualifiers_dictionary(database, feature_id):
+def get_qualifiers_dictionary(project, feature_id):
     
     """
     Takes sequence record annotation, source qualifiers and feature qualifiers and puts them
@@ -571,8 +571,8 @@ def get_qualifiers_dictionary(database, feature_id):
     # Making a dummy locus    
     >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
     
-    # Making a dummy Database
-    >>> db = Database([coi])
+    # Making a dummy Project
+    >>> pj = Project([coi])
     
     # making a dummy record
     >>> s = 'atgc'*1000
@@ -590,10 +590,10 @@ def get_qualifiers_dictionary(database, feature_id):
     >>> record.features.append(feature)
     >>> record.features.append(source)
     >>> record.annotations["evidence"] = 'made up'
-    >>> db.records = [record]
+    >>> pj.records = [record]
     
     # executing get_qualifiers_dictionary()
-    >>> qual_dict = get_qualifiers_dictionary(db, '12345')
+    >>> qual_dict = get_qualifiers_dictionary(pj, '12345')
     >>> qual_items = qual_dict.items()
     >>> qual_items.sort(key = lambda i: i[0])
     >>> for key, val in qual_items: print(key.ljust(20,' ') + val.ljust(20,' '))
@@ -606,7 +606,7 @@ def get_qualifiers_dictionary(database, feature_id):
         feature_id = feature_id[0]
     record_id = feature_id.split('_')[0]
     qualifiers_dictionary={}
-    for record in database.records:
+    for record in project.records:
         if record.id in feature_id:
             for annotation in record.annotations.keys():
                 qualifiers_dictionary['annotation_'+annotation]=record.annotations[annotation]
@@ -684,13 +684,13 @@ def read_feature_quals_from_tab_csv(csv_filename):
 
 
 ##############################################################################################
-class Database:
+class Project:
 ##############################################################################################
     
     """
-    The Database class contians all the data and has methods to analyze it. It allows for
+    The Project class contians all the data and has methods to analyze it. It allows for
     experimental analysis by running alternative analyses and formally comparing the 
-    outputs. The pickle_db() function allows to pickle the database, including the data,
+    outputs. The pickle_pj() function allows to pickle the project, including the data,
     intermediates and results, as well as a description of the methods.It allows for a rerun
     of the whole analysis as is, as well as for a reconfiguration of the analysis or addition
     of data. If git is installed, it can be called by 'import rpgit'. As a result, git can be 
@@ -707,10 +707,10 @@ class Database:
         >>> coi = Locus('dna','CDS','coi',['COX1','cox1'])
         >>> ssu = Locus('dna','rRNA','18S',['18S','SSU'])
         
-        # Making a Database object
-        >>> db = Database([coi,ssu])
-        >>> print(str(db))
-        Database object with the loci coi,18S,
+        # Making a Project object
+        >>> pj = Project([coi,ssu])
+        >>> print(str(pj))
+        Project object with the loci coi,18S,
         """
         self.records = []
         self.loci = loci
@@ -787,12 +787,12 @@ class Database:
         loci_string = ''
         for i in self.loci:
             loci_string += i.name+','
-        return 'Database object with the loci '+loci_string
+        return 'Project object with the loci '+loci_string
 
 
 
     ###################################
-    # Database methods for reading data
+    # Project methods for reading data
     ###################################  
 
 
@@ -804,11 +804,11 @@ class Database:
         
         >>> input_filenames = ['data/example.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> db = Database([locus])
-        >>> print(len(db.records))
+        >>> pj = Project([locus])
+        >>> print(len(pj.records))
         0
-        >>> db.read_embl_genbank(input_filenames)
-        >>> print(len(db.records))
+        >>> pj.read_embl_genbank(input_filenames)
+        >>> print(len(pj.records))
         90
         """
         
@@ -848,26 +848,26 @@ class Database:
 
         >>> input_filenames = ['data/example.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> db = Database([locus])
-        >>> print(len(db.records))
+        >>> pj = project([locus])
+        >>> print(len(pj.records))
         0
-        >>> db.read_embl_genbank(input_filenames)
-        >>> print(len(db.records))
+        >>> pj.read_embl_genbank(input_filenames)
+        >>> print(len(pj.records))
         90
         >>> input_filenames = ['data/example_denovo.fasta']
-        >>> db.read_denovo(input_filenames, 'dna')
-        >>> print(len(db.records))
+        >>> pj.read_denovo(input_filenames, 'dna')
+        >>> print(len(pj.records))
         91
         
         # Since the denovo sequence has no feature it is not included
-        >>> db.extract_by_locus()
-        >>> print(len(db.records_by_locus['coi']))
+        >>> pj.extract_by_locus()
+        >>> print(len(pj.records_by_locus['coi']))
         90
         
         # Making a feature for the denovo record.
-        >>> db.add_feature_to_record('denovo0', 'CDS',  qualifiers={'gene': 'coi'})
-        >>> db.extract_by_locus()
-        >>> print(len(db.records_by_locus['coi']))
+        >>> pj.add_feature_to_record('denovo0', 'CDS',  qualifiers={'gene': 'coi'})
+        >>> pj.extract_by_locus()
+        >>> print(len(pj.records_by_locus['coi']))
         91
         """
         
@@ -916,8 +916,8 @@ class Database:
         # Making a dummy locus    
         >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
     
-        # Making a dummy Database
-        >>> db = Database([coi])
+        # Making a dummy Project
+        >>> pj = Project([coi])
     
         # making a dummy record
         >>> s = 'atgc'*1000
@@ -926,13 +926,13 @@ class Database:
         >>> source.type = 'source'
         >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
         >>> record.features.append(source)
-        >>> db.records = [record]
-        >>> print(len(db.records[0].features))
+        >>> pj.records = [record]
+        >>> print(len(pj.records[0].features))
         1
         
-        # adding a feature to a record in the db
-        >>> db.add_feature_to_record('1', 'CDS', qualifiers={'gene': 'madeuplocus'})
-        >>> print(len(db.records[0].features))
+        # adding a feature to a record in the pj
+        >>> pj.add_feature_to_record('1', 'CDS', qualifiers={'gene': 'madeuplocus'})
+        >>> print(len(pj.records[0].features))
         2
         """
     
@@ -1010,7 +1010,7 @@ class Database:
 
 
     ##############################################
-    # Database methods for managing concatenations
+    # Project methods for managing concatenations
     ##############################################  
 
 
@@ -1018,7 +1018,7 @@ class Database:
     def add_concatenation(self, concatenation_object):
         
         """
-        add a Concatenation object to the Database
+        add a Concatenation object to the Project
         
         # making dummy loci
         >>> coi = Locus('dna','CDS','coi',['COX1','cox1'])
@@ -1038,12 +1038,12 @@ class Database:
         and at least one of each group of [ 18S 28S ] is represented.
         Alignments with the following names: MafftLinsi@Gappyout are prefered
         
-        # making a dummy Database
-        >>> db = Database(loci)
+        # making a dummy Project
+        >>> pj = Project(loci)
         
-        # Including the Concatenation in the Database
-        >>> db.add_concatenation(combined)
-        >>> print(len(db.concatenations))
+        # Including the Concatenation in the Project
+        >>> pj.add_concatenation(combined)
+        >>> print(len(pj.concatenations))
         1
         """
         
@@ -1063,7 +1063,7 @@ class Database:
         
         """
         Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
-        to the db.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
+        to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
         following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
         trimmed alignment will be the Concatenation object name attribute.
         """
@@ -1086,7 +1086,7 @@ class Database:
             for locus in s.loci:
                 available_features[locus.name] = []
                 for record in self.records_by_locus[locus.name]:
-                    available_features[locus.name].append(record.id) # record ids are feature ids because taken from db.records_by_locus
+                    available_features[locus.name].append(record.id) # record ids are feature ids because taken from pj.records_by_locus
 
             # make a dict of individuals that fulfil the concat's first rule
             seen_locus_names = []
@@ -1156,20 +1156,20 @@ class Database:
             keys_of_trimmed_alignments_to_use_in_concat = []
             for locus in s.loci:
                 trimmed_aln = None
-                all_locus_trimmed_alns_in_db = []
+                all_locus_trimmed_alns_in_pj = []
                 for key in self.trimmed_alignments.keys():
                     if locus.name == key.split('@')[0]:
-                        all_locus_trimmed_alns_in_db.append(key)
-                if len(all_locus_trimmed_alns_in_db) == 1:
-                    trimmed_aln = all_locus_trimmed_alns_in_db[0]
-                elif len(all_locus_trimmed_alns_in_db) == 0:
+                        all_locus_trimmed_alns_in_pj.append(key)
+                if len(all_locus_trimmed_alns_in_pj) == 1:
+                    trimmed_aln = all_locus_trimmed_alns_in_pj[0]
+                elif len(all_locus_trimmed_alns_in_pj) == 0:
                     raise RuntimeError('Locus '+locus.name+' have no trimmed alignments')
                 else:
                     s.define_trimmed_alns.sort(key = lambda i: i.count('@'), reverse=True)
                     for definition in s.define_trimmed_alns:
                         if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
                             trimmed_aln = definition
-                        elif definition.count('@') == 1 and bool(any(definition in i for i in all_locus_trimmed_alns_in_db)):
+                        elif definition.count('@') == 1 and bool(any(definition in i for i in all_locus_trimmed_alns_in_pj)):
                             trimmed_aln = locus.name+'@'+definition
                         else:
                             raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
@@ -1199,7 +1199,7 @@ class Database:
 
 
     ###################################################
-    # Database methods for modifying feature qualifiers
+    # Project methods for modifying feature qualifiers
     ###################################################
 
 
@@ -1207,7 +1207,7 @@ class Database:
     def write(self, filename, format = 'genbank'):
         
         """
-        Write the records in the database in any Biopython format, as csv or as nexml.
+        Write the records in the project in any Biopython format, as csv or as nexml.
         
         The csv table has a line for each feature (ie multiplt lines for records
         with multiple non-source featue). Each line will include the records annotations,
@@ -1216,7 +1216,7 @@ class Database:
         will be repeted in several lines, once for each non-source feature in the record.
         The csv file is primarily usefull for reviewing and editing feature qualifiers
         
-        The nexml format only includes the trees from the db.trees dictionary, but all 
+        The nexml format only includes the trees from the pj.trees dictionary, but all 
         the metadata is included as leaf metadata, including the sequences and the
         trimmed and alligned sequences for each leaf.
         """
@@ -1306,7 +1306,7 @@ class Database:
         
         
         """
-        Searches db.records for features that have the value IF_THIS in the qualifier IN_THIS
+        Searches pj.records for features that have the value IF_THIS in the qualifier IN_THIS
         and places the value THEN_THAT in the qualifier IN_THAT, which either exists or is new.
         
         The IF_THIS value can either match completely (mode = 'whole') or just to a part (mode = 'part')
@@ -1314,15 +1314,15 @@ class Database:
         
         The following demonstartes all the feature qualifier editing methods
         
-        # Make a dummy db with a locus and with records
+        # Make a dummy pj with a locus and with records
         >>> input_filenames = ['data/example.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> db = Database([locus])
-        >>> db.read_embl_genbank(input_filenames)
+        >>> pj = Project([locus])
+        >>> pj.read_embl_genbank(input_filenames)
         
         # copying a source qualifier into the feature qualifiers so that it
         # will be available for editing (source qualifiers are kept imutable)
-        >>> db.add_qualifier_from_source('organism')
+        >>> pj.add_qualifier_from_source('organism')
         
         # populate a new qualifier based on the data in another
         # Here we will take only the the genus name from the organism qualifier
@@ -1331,11 +1331,11 @@ class Database:
         # fits only the start of the organism name
         >>> tetillid_genera = ['Tetilla', 'Cinachyrella', 'Craniella']
         >>> for g in tetillid_genera:
-        ...     db.if_this_then_that(g, 'organism', g, 'genus', mode='part')
+        ...     pj.if_this_then_that(g, 'organism', g, 'genus', mode='part')
         
         # Now we will add a sample id to all the sequences which belong to
         # sample TAU_25617
-        >>> db.add_qualifier(['JX177913.1_f0',
+        >>> pj.add_qualifier(['JX177913.1_f0',
         ...                  'JX177935.1_f0',
         ...                  'JX177965.1_f0'],
         ...                  'specimen_voucher',
@@ -1343,11 +1343,11 @@ class Database:
     
         # We are using a copy paste approch to unite the data from 
         # differen qualifiers under on qualifiers
-        >>> db.copy_paste_within_feature('variant', 'strain_or_variant')
-        >>> db.copy_paste_within_feature('strain', 'strain_or_variant')
+        >>> pj.copy_paste_within_feature('variant', 'strain_or_variant')
+        >>> pj.copy_paste_within_feature('strain', 'strain_or_variant')
         
         # Now we print the qualifier of a random feature as an example
-        >>> qual_dict = get_qualifiers_dictionary(db, 'JX177913.1_f0')
+        >>> qual_dict = get_qualifiers_dictionary(pj, 'JX177913.1_f0')
         >>> qual_items = qual_dict.items()
         >>> qual_items.sort(key = lambda i: i[0])
         >>> for key, val in qual_items:
@@ -1517,7 +1517,7 @@ class Database:
                 
                 
     ######################################                
-    # Database methods to analyze the data
+    # Project methods to analyze the data
     ######################################
     
     
@@ -1529,12 +1529,12 @@ class Database:
         >>> input_filenames = ['data/example.gb']
         >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
         >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
-        >>> db = Database([coi, lsu])
-        >>> db.read_embl_genbank(input_filenames)
-        >>> db.extract_by_locus()
-        >>> print(len(db.records_by_locus['coi']))
+        >>> pj = Project([coi, lsu])
+        >>> pj.read_embl_genbank(input_filenames)
+        >>> pj.extract_by_locus()
+        >>> print(len(pj.records_by_locus['coi']))
         90
-        >>> print(len(db.records_by_locus['28S']))
+        >>> print(len(pj.records_by_locus['28S']))
         48
         """
         
@@ -1881,13 +1881,21 @@ class Database:
                  heat_map_meta = None, #list
                  heat_map_colour_scheme=2,
                  
-                 multifurc=None
+                 multifurc=None,
+                 
+                 scale = 1000,
+                 
+                 html = None
                  ): 
-    
+            
+            stdout = sys.stdout
+            if html:
+                sys.stdout = open(html, 'wt')
+                
             print '<html>'
             ts = TreeStyle()
             ts.show_leaf_name = False
-            ts.scale = 1000
+            ts.scale = scale
             if node_support_dict:
                 ts.legend_position=1
                 ts.legend.add_face(TextFace('Node support: ', fsize=10), column=0)
@@ -2000,13 +2008,14 @@ class Database:
                                 node.add_face(CircleFace(radius = 5, color = key),column=0, position = "float")             
                     
                 self.trees[tree][0].render(fig_folder + "/"+self.trees[tree][0].get_leaves()[0].tree_method_id+'.png',w=1000, tree_style=ts)
-                print('<A href=file://'+
+                print('<A href='+
                        fig_folder + "/" + self.trees[tree][0].get_leaves()[0].tree_method_id+'.png'+
                        '>'+self.trees[tree][0].get_leaves()[0].tree_method_id+
                        '</A><BR>')
             print '</html>'
             print fig_folder
-
+            sys.stdout = stdout
+     
 
 
 #    def trim(self):
@@ -2020,6 +2029,10 @@ class Database:
             
     def trim(self, list_of_Conf_objects):
         for m in list_of_Conf_objects:
+            m.timeit.append(time.time())
+            m.platform = platform_report() 
+            m.platform.append('Program and version: '+ m.cmd + ': ' +
+                               os.popen(m.cmd + ' --version').readlines()[1])
             if isinstance(m, TrimalConf):
                 import subprocess as sub
                 for aln in m.command_lines.keys():
@@ -2035,8 +2048,9 @@ class Database:
             for file_name in os.listdir(os.curdir):
                         if m.id.partition('_')[0] in file_name:
                             os.remove(file_name)
-            
-
+            m.timeit.append(time.time())
+            m.timeit.append(m.timeit[2]-m.timeit[1])
+            self.used_methods.append(m)
 
 ##############################################################################################
 class AlnConf:
@@ -2045,25 +2059,25 @@ class AlnConf:
     """
     >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
     >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
-    >>> db = Database([coi, lsu])
+    >>> pj = Project([coi, lsu])
     
-    # cline_str = muscle = AlnConf(db, method_name='MuscleDefaults',
+    # cline_str = muscle = AlnConf(pj, method_name='MuscleDefaults',
     #                                      cmd='muscle', program_name='muscle',
     #                                     cline_args=dict())
     """
     
-    def __init__(self, db, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
+    def __init__(self, pj, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
                  cmd='mafft', loci='all',
                  cline_args=dict(localpair=True, maxiterate=1000)):
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.CDSAlign=CDSAlign
         self.program_name=program_name
-        self.loci = db.loci
+        self.loci = pj.loci
         if not loci == 'all':
             self.loci = []
             for locus_name in loci:
-                for locus in db.loci:
+                for locus in pj.loci:
                     if locus_name == locus.name:
                         self.loci.append(locus)
         self.CDS_proteins = {}
@@ -2074,10 +2088,10 @@ class AlnConf:
         self.platform = []
         self.cmd = cmd
         # make defalut input files
-        if db.records_by_locus == {}:
-            db.extract_by_locus()
-        for key in db.records_by_locus.keys():
-            SeqIO.write(db.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
+        if pj.records_by_locus == {}:
+            pj.extract_by_locus()
+        for key in pj.records_by_locus.keys():
+            SeqIO.write(pj.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
         for locus in self.loci:
             # put default input file filename and string in the AlnConf object
             input_filename=self.id+'_'+locus.name+'.fasta'
@@ -2086,7 +2100,7 @@ class AlnConf:
             if locus.feature_type == 'CDS' and locus.char_type == 'dna' and self.CDSAlign: 
                 self.CDS_proteins[locus.name] = []
                 self.CDS_in_frame[locus.name] = []
-                for record in db.records:
+                for record in pj.records:
                     for feature in record.features:
                         if (not feature.type == 'source' and 'gene' in feature.qualifiers.keys() and
                             feature.qualifiers['gene'][0] in locus.aliases):
@@ -2122,11 +2136,11 @@ class AlnConf:
                            
                                     
                 # check same number of prot and cds objects                    
-                if len(db.records_by_locus[locus.name]) > len(self.CDS_proteins[locus.name]):
+                if len(pj.records_by_locus[locus.name]) > len(self.CDS_proteins[locus.name]):
                     raise RuntimeError('For the CDS locus '+locus.name+': more nuc seqs than prot seqs.'+
                                        ' You may miss a \'translate\' or \'gene\' qualifier in some of '+
                                        'the features.')
-                elif len(db.records_by_locus[locus.name]) < len(self.CDS_proteins[locus.name]):
+                elif len(pj.records_by_locus[locus.name]) < len(self.CDS_proteins[locus.name]):
                     raise RuntimeError('For the CDS locus '+locus.name+': less nuc seqs than prot seqs.'+
                                        ' You may miss a \'translate\' or \'gene\' qualifier in some of '+
                                        'the features.')
@@ -2185,18 +2199,18 @@ class AlnConf:
 ##############################################################################################
 class TrimalConf:
 ##############################################################################################
-    def __init__(self, db, method_name='gappyout', program_name='trimal',
+    def __init__(self, pj, method_name='gappyout', program_name='trimal',
                  cmd='trimal', alns='all', trimal_commands=dict(gappyout=True)):
         
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.program_name=program_name
-        self.alignments = db.alignments
+        self.alignments = pj.alignments
         if not alns == 'all':
             self.alignments = {}
             for aln_name in alns:
-                if aln_name in db.alignments.keys():
-                    self.alignments[aln_name] = db.alignments[aln_name]
+                if aln_name in pj.alignments.keys():
+                    self.alignments[aln_name] = pj.alignments[aln_name]
         self.command_lines = {}
         self.timeit = [time.asctime()]
         self.platform = []
@@ -2258,14 +2272,14 @@ def transfer_support_same_topo(tree_file_with_support,
     unsupported.write(outfile = tree_file_without_support)    
     
     
-def make_raxml_partfile(tree_method, db, trimmed_alignment_name):
+def make_raxml_partfile(tree_method, pj, trimmed_alignment_name):
 
     concatenation = None
-    for c in db.concatenations:
+    for c in pj.concatenations:
         if c.name == trimmed_alignment_name:
             concatenation = c
     
-    #concatenation = filter(lambda concatenation: concatenation.name == trimmed_alignment_name, db.concatenations)[0]
+    #concatenation = filter(lambda concatenation: concatenation.name == trimmed_alignment_name, pj.concatenations)[0]
     
     model = []
     for locus in concatenation.loci:
@@ -2304,7 +2318,7 @@ def make_raxml_input_matrix_file(tree_method, trimmed_alignment_name):
                 tree_method.id+'_'+trimmed_alignment_name+'.fasta','fasta')
     return tree_method.id+'_'+trimmed_alignment_name+'.fasta'
 
-def write_raxml_clines(tree_method, db, trimmed_alignment_name):
+def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
             
     cline_que = 0
 
@@ -2319,14 +2333,14 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
     
     # Check if it is a concatenation and make partfile
 
-    for c in db.concatenations:
+    for c in pj.concatenations:
         if c.name == trimmed_alignment_name.partition('@')[0]:
-            partfile = make_raxml_partfile(tree_method, db, trimmed_alignment_name)
+            partfile = make_raxml_partfile(tree_method, pj, trimmed_alignment_name)
     
     input_filename = make_raxml_input_matrix_file(tree_method, trimmed_alignment_name)
     model = tree_method.model
     try:
-        locus_char_type = filter(lambda locus: locus.name == trimmed_alignment_name.partition('@')[0], db.loci)[0].char_type
+        locus_char_type = filter(lambda locus: locus.name == trimmed_alignment_name.partition('@')[0], pj.loci)[0].char_type
     except:
         locus_char_type = 'prot'
     
@@ -2400,7 +2414,7 @@ def write_raxml_clines(tree_method, db, trimmed_alignment_name):
 class RaxmlConf:
     
     
-    def __init__(self, db, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
+    def __init__(self, pj, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
                  cmd='raxmlHPC-PTHREADS-SSE3', preset = 'fa', alns='all', model='GAMMA', matrix='JTT', threads=4,
                  cline_args={}):
         self.id = str(random.randint(10000,99999))+str(time.time())
@@ -2411,12 +2425,12 @@ class RaxmlConf:
         self.model = model
         self.matrix = matrix
         self.threads = threads
-        self.trimmed_alignments = db.trimmed_alignments
+        self.trimmed_alignments = pj.trimmed_alignments
         if not alns == 'all':
             self.trimmed_alignments = {}
             for aln_name in alns:
-                if aln_name in db.trimmed_alignments.keys():
-                    self.trimmed_alignments[aln_name] = db.trimmed_alignments[aln_name]
+                if aln_name in pj.trimmed_alignments.keys():
+                    self.trimmed_alignments[aln_name] = pj.trimmed_alignments[aln_name]
         self.aln_input_strings = {}
         self.command_lines = {}
         self.timeit = [time.asctime()]
@@ -2425,7 +2439,7 @@ class RaxmlConf:
         
         for trimmed_alignment in self.trimmed_alignments.keys():
             self.command_lines[trimmed_alignment] = []
-            command_lines = write_raxml_clines(self, db, trimmed_alignment)
+            command_lines = write_raxml_clines(self, pj, trimmed_alignment)
             for command_line in command_lines:
                 cline_object = RaxmlCommandline(cmd=cmd)
                 for c in command_line.keys():
@@ -2497,7 +2511,7 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     close('all')
     return figs_folder + '/' + name+'.png'
     
-def report_methods(db, figs_folder):
+def report_methods(pj, figs_folder):
         report_lines = ['<html>','<head>','<h1>']
     
         head = 'reprophylo analysis from '+str(time.asctime())
@@ -2512,7 +2526,7 @@ def report_methods(db, figs_folder):
         #--------------------------------------------------------
         
         outfile_name= str(random.randint(1000,2000))
-        db.species_vs_loci(outfile_name)
+        pj.species_vs_loci(outfile_name)
         with open(outfile_name, 'rb') as csvfile:
             sp_vs_lc = list(csv.reader(csvfile, delimiter='\t', quotechar='|'))
             field_sizes = []
@@ -2530,12 +2544,12 @@ def report_methods(db, figs_folder):
         os.remove(outfile_name)
         
         
-        if len(db.records_by_locus.keys())>0:
-            scale = str(len(db.records_by_locus.keys())*200)
+        if len(pj.records_by_locus.keys())>0:
+            scale = str(len(pj.records_by_locus.keys())*200)
             lengths_dict = {}
-            for locus_name in db.records_by_locus.keys():
+            for locus_name in pj.records_by_locus.keys():
                 lengths_dict[locus_name] = []
-                for record in db.records_by_locus[locus_name]:
+                for record in pj.records_by_locus[locus_name]:
                     lengths_dict[locus_name].append(len(record.seq))
             fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', figs_folder)
             title = 'Distribution of sequence lengths'
@@ -2551,10 +2565,10 @@ def report_methods(db, figs_folder):
                 ylabel = 'GC ontent (%)'
                 if not stat == 'GC_content':
                     ylabel = 'Aambiguous positions (prop)'
-                for locus_name in db.records_by_locus.keys():
+                for locus_name in pj.records_by_locus.keys():
                     stat_dict[locus_name] = []
-                    for i in db.records_by_locus[locus_name]:
-                        for record in db.records:
+                    for i in pj.records_by_locus[locus_name]:
+                        for record in pj.records:
                             for feature in record.features:
                                 if feature.qualifiers['feature_id'][0] == i.id:
                                     if stat in feature.qualifiers.keys():
@@ -2569,8 +2583,8 @@ def report_methods(db, figs_folder):
                     os.remove(fig_filename)
                     
         composed_concatenations = []
-        for c in db.concatenations:
-            if c.name in db.trimmed_alignments.keys():
+        for c in pj.concatenations:
+            if c.name in pj.trimmed_alignments.keys():
                 composed_concatenations.append(c)
         
         
@@ -2615,7 +2629,7 @@ def report_methods(db, figs_folder):
                 otu_species = ''
                 for locus in loci:
                     if locus in c.feature_id_dict[otu].keys():
-                        feature_qualifiers = get_qualifiers_dictionary(db, c.feature_id_dict[otu][locus])
+                        feature_qualifiers = get_qualifiers_dictionary(pj, c.feature_id_dict[otu][locus])
                         if 'source_organism' in feature_qualifiers.keys():
                             otu_species = feature_qualifiers['source_organism']
                     
@@ -2630,8 +2644,8 @@ def report_methods(db, figs_folder):
         report_lines += ['</pre>', '<h2>','Methods','</h2>', '<pre>', '']
         
         
-        for method in db.used_methods:
-            if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf'):
+        for method in pj.used_methods:
+            if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf' or method[0] == 'TrimalConf'):
                 title = method[0]
                 report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
                 for i in method[1:]:
@@ -2674,10 +2688,31 @@ def report_methods(db, figs_folder):
                 report_lines.append('Command lines:')
                 for aln in method.command_lines.keys():
                     report_lines.append('Alignment \"'+aln+'\":')
+                    report_lines.append('<pre style="white-space:normal;">')
                     for cline in method.command_lines[aln]:
-                        report_lines.append('<pre style="white-space:normal;">')
                         report_lines.append(str(cline))
-                        report_lines.append('</pre>')
+                    report_lines.append('</pre>')
+                    report_lines.append('')
+                    
+            elif isinstance(method, TrimalConf):
+                title = 'Trimal alignment trimming Method \"'+method.method_name+'\", method ID: '+method.id
+                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                #--------------------------------------------------------
+                aln_line = 'Included alignments :'
+                for aln in method.alignments.keys():
+                    aln_line += aln + ', '
+                report_lines.append(aln_line)
+                report_lines.append('Total execution time: '+str(method.timeit[3])+' sec\'')
+                report_lines.append('Performed on: '+str(method.timeit[0]))
+                report_lines += method.platform
+                report_lines.append('')
+
+                report_lines.append('Command lines:')
+                for aln in method.command_lines.keys():
+                    report_lines.append('Alignment \"'+aln+'\":')
+                    report_lines.append('<pre style="white-space:normal;">')
+                    report_lines.append(str(method.command_lines[aln]))
+                    report_lines.append('</pre>')
                     report_lines.append('')
                 
         
@@ -2685,45 +2720,45 @@ def report_methods(db, figs_folder):
         report_lines += ('</pre>', '','') 
         
         
-        if len(db.alignments.keys())>0:                    
+        if len(pj.alignments.keys())>0:                    
             title = 'Alignment statistics before trimming'
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
             report_lines += ['</pre>', '<h4>','Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=False)
+            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=False)
             if os.path.isfile(fig_file):
                     data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
                     img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_file)
             report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=False, alg='-sgc')
+            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=False, alg='-sgc')
             if os.path.isfile(fig_file):
                     data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
                     img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_file)
                
-        if len(db.trimmed_alignments.keys())>0:          
+        if len(pj.trimmed_alignments.keys())>0:          
             title = 'Alignment statistics after trimming'
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
             report_lines += ['</pre>', '<h4>','"Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=True)
+            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=True)
             if os.path.isfile(fig_file):
                     data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
                     img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_file)
             report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(db, 2, figs_folder, trimmed=True, alg='-sgc')
+            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=True, alg='-sgc')
             if os.path.isfile(fig_file):
                     data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
                     img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     os.remove(fig_file)
         
-        if len(db.trees.keys())>1:        
+        if len(pj.trees.keys())>1:        
             report_lines += ('','<h1>Robinson-Foulds distances </h1>','')
-            RF_filename, legend = calc_rf(db, figs_folder)
+            RF_filename, legend = calc_rf(pj, figs_folder)
             scale = str(len(legend)*60)
             if os.path.isfile(RF_filename):
                     data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
@@ -2738,21 +2773,21 @@ def report_methods(db, figs_folder):
         report_lines += ('<h1>Trees</h1>','')
         
         
-        for tree in db.trees.keys():
+        for tree in pj.trees.keys():
             report_lines += ('<h2>'+tree.split('@')[0]+'</h2>',
                              '<h3>Alignment method: '+tree.split('@')[1]+'</h3>',
                              '<h3>Trimming method: '+tree.split('@')[2]+'</h3>',
                              '<h3>Tree method: '+tree.split('@')[3]+'</h3>',
                              '<pre style="white-space:normal;">',
-                             'Tree Method ID: '+db.trees[tree][0].get_leaves()[0].tree_method_id,'</pre>')
+                             'Tree Method ID: '+pj.trees[tree][0].get_leaves()[0].tree_method_id,'</pre>')
             
-            report_lines += ('<h3>newick format</h3>','','<pre style="white-space:normal;">',db.trees[tree][0].write(),'</pre>','')
-            report_lines += ('<h3>nhx format</h3>','','<pre>',db.trees[tree][1],'</pre>','','','','')
+            report_lines += ('<h3>newick format</h3>','','<pre style="white-space:normal;">',pj.trees[tree][0].write(),'</pre>','')
+            report_lines += ('<h3>nhx format</h3>','','<pre>',pj.trees[tree][1],'</pre>','','','','')
             
             
             
-            if os.path.isfile(figs_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
-                data_handle = open(figs_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png','rb')
+            if os.path.isfile(figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
+                data_handle = open(figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png','rb')
                 data_uri = data_handle.read().encode('base64').replace('\n', '')
                 data_handle.close()
                 img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
@@ -2764,27 +2799,27 @@ def report_methods(db, figs_folder):
         return report_lines
     
         
-def pickle_db(db, pickle_file_name):
+def pickle_pj(pj, pickle_file_name):
         import os
         if os.path.exists(pickle_file_name):
             os.remove(pickle_file_name)
         import cloud.serialization.cloudpickle as pickle
         output = open(pickle_file_name,'wb')
-        pickle.dump(db, output)
+        pickle.dump(pj, output)
         output.close()
         if __builtin__.git:
             import rpgit
             rpgit.gitAdd(pickle_file_name)
-            comment = "A pickled Database from %s" % time.asctime()
+            comment = "A pickled Project from %s" % time.asctime()
             rpgit.gitCommit(comment) 
             
         return pickle_file_name
     
-def unpickle_db(pickle_file_name):
+def unpickle_pj(pickle_file_name):
         import cloud.serialization.cloudpickle as pickle
         pickle_handle = open(pickle_file_name, 'rb')
-        pkl_db = pickle.pickle.load(pickle_handle)
-        new_db = Database(pkl_db.loci)
+        pkl_pj = pickle.pickle.load(pickle_handle)
+        new_pj = Project(pkl_pj.loci)
         attr_names = ['alignments',
                       'concatenations',
                       'records',
@@ -2794,11 +2829,11 @@ def unpickle_db(pickle_file_name):
                       ]
         
         for attr_name in attr_names:
-           setattr(new_db,attr_name,getattr(pkl_db,attr_name))
+           setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
             
-        for i in pkl_db.used_methods:
+        for i in pkl_pj.used_methods:
             if isinstance(i, list) and (i[0] == 'AlnConf' or i[0] == 'RaxmlConf' or i[0] == 'TrimalConf'):
-                new_db.used_methods.append(i)
+                new_pj.used_methods.append(i)
             else:
                 
                 include = ['id',
@@ -2825,10 +2860,10 @@ def unpickle_db(pickle_file_name):
                 for attr in include:
                     if attr in dir(i):
                         method_list.append([attr, str(getattr(i,attr))])
-                new_db.used_methods.append(method_list)
-        return new_db
+                new_pj.used_methods.append(method_list)
+        return new_pj
 
-def publish(db, folder_name, figures_folder):
+def publish(pj, folder_name, figures_folder):
     
     import os, time
     folder = None
@@ -2843,22 +2878,22 @@ def publish(db, folder_name, figures_folder):
         raise IOError(folder_name + ' already exists')
     
     os.makedirs(folder)
-    db.write(folder+'/tree_and_alns.nexml','nexml')
-    db.write(folder+'/sequences_and_metadata.gb','genbank')
+    pj.write(folder+'/tree_and_alns.nexml','nexml')
+    pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
-    for line in report_methods(db, figures_folder):
+    for line in report_methods(pj, figures_folder):
         report.write(line + '\n')
     report.close()
 
-    for tree in db.trees.keys():
-        if os.path.isfile(figures_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
+    for tree in pj.trees.keys():
+        if os.path.isfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
             from shutil import copyfile
-            copyfile(figures_folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png',
-                     folder+'/'+db.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
+            copyfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png',
+                     folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
             
          
     pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
-    pickle_db(db, folder + '/' + pickle_name)
+    pickle_pj(pj, folder + '/' + pickle_name)
 
     
     import zipfile, shutil
@@ -2871,27 +2906,27 @@ def publish(db, folder_name, figures_folder):
     zf.close()
     shutil.rmtree(folder)
     
-def calc_rf(db, figs_folder):
+def calc_rf(pj, figs_folder):
     meta = 'feature_id'
-    if len(db.concatenations) > 0:
-        meta = db.concatenations[0].otu_meta
+    if len(pj.concatenations) > 0:
+        meta = pj.concatenations[0].otu_meta
 
-    trees = db.trees.keys()
+    trees = pj.trees.keys()
 
     data = []
 
     for t1 in trees:
         line = []
-        dupT1 = Tree(db.trees[t1][0].write())
+        dupT1 = Tree(pj.trees[t1][0].write())
         for l in dupT1:
-            for record in db.records:
+            for record in pj.records:
                 for feature in record.features:
                     if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                         l.name = feature.qualifiers[meta][0]
         for t2 in trees:
-            dupT2 = Tree(db.trees[t2][0].write())
+            dupT2 = Tree(pj.trees[t2][0].write())
             for l in dupT2:
-                for record in db.records:
+                for record in pj.records:
                     for feature in record.features:
                         if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                             l.name = feature.qualifiers[meta][0]
@@ -2928,7 +2963,7 @@ def calc_rf(db, figs_folder):
     close('all')
     return figs_folder + '/' + name+'.png', legend 
 
-def draw_trimal_scc(db, num_col, figs_folder, trimmed=False, alg = '-scc'):
+def draw_trimal_scc(pj, num_col, figs_folder, trimmed=False, alg = '-scc'):
     import pandas as pd
     import matplotlib.pyplot as plt
     import random, os
@@ -2936,9 +2971,9 @@ def draw_trimal_scc(db, num_col, figs_folder, trimmed=False, alg = '-scc'):
     
     # get the alignment objects
     #-------------------------#
-    alignments = db.alignments.items()
+    alignments = pj.alignments.items()
     if trimmed:
-        alignments = db.trimmed_alignments.items()
+        alignments = pj.trimmed_alignments.items()
     num_alns = len(alignments)
 
     subplots_arrangement = []

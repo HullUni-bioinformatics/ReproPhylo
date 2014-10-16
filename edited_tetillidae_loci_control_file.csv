@@ -1,6 +1,4 @@
 dna,rRNA,18s,18S ribosomal RNA,18S rRNA,small subunit 18S ribosomal RNA
 dna,rRNA,28s,28S large subunit ribosomal RNA,28S ribosomal RNA
-dna,CDS,ATP6,atp6,ATP6,1
-dna,CDS,Atp6,Atp6,1
-prot,CDS,coi,coi,COI,cox1,COX1,coxI,2
+dna,CDS,coi,coi,COI,cox1,COX1,coxI,2
 dna,CDS,cytochrome_c_oxidase_subunit_I,cytochrome c oxidase subunit I,2
