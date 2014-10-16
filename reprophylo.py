@@ -39,7 +39,7 @@ if False:
 
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast
+import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast, gb_syn
 import subprocess as sub
 #import cloud.serialization.cloudpickle as pickle
 from Bio.Seq import Seq
@@ -72,7 +72,7 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
    if  loci_report: 
         sys.stdout = open(loci_report, 'w')
     
-   genbank_synonyms = ast.literal_eval(open('genbank_synonyms','r').read())
+   genbank_synonyms = gb_syn.gb_syn()
     
    # Open GenBank file
    MelPCgenes = open(genbank_filename, 'rU')
