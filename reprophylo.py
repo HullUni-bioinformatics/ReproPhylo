@@ -36,7 +36,7 @@ if False:
 
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, RpGit#, subprocess
+import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit
 import subprocess as sub
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
@@ -205,7 +205,7 @@ __builtin__.git = False
 
 def start_git():
     __builtin__.git = True
-    RpGit.gitInit()
+    rpgit.gitInit()
     cwd = os.getcwd()
     import fnmatch
     matches = []
@@ -215,9 +215,9 @@ def start_git():
         for filename in fnmatch.filter(filenames, '*.ipynb'):
             matches.append(os.path.join(root, filename))
     for match in matches:
-        RpGit.gitAdd(match)
+        rpgit.gitAdd(match)
     comment = "%i script file(s) from %s" % (len(matches), time.asctime())
-    RpGit.gitCommit(comment)
+    rpgit.gitCommit(comment)
     
     
     
@@ -232,9 +232,9 @@ def stop_git():
         for filename in fnmatch.filter(filenames, '*.ipynb'):
             matches.append(os.path.join(root, filename))
     for match in matches:
-        RpGit.gitAdd(match)
+        rpgit.gitAdd(match)
     comment = "%i script file(s) from %s" % (len(matches), time.asctime())
-    RpGit.gitCommit(comment)
+    rpgit.gitCommit(comment)
     
 
 
@@ -574,10 +574,11 @@ class Database:
     outputs. The pickle_db() function allows to pickle the database, including the data,
     intermediates and results, as well as a description of the methods.It allows for a rerun
     of the whole analysis as is, as well as for a reconfiguration of the analysis or addition
-    of data. If git is installed, it can be called by 'import RpGit'. As a result, a git repository
-    will be created in the CWD, if it doesn't already exist. Input datasets, .py, .ipynb and .pkl files
-    in the CWD will be version controlled. Version control can be paused in the middle of the script
-    by calling stop_RpGit() and restarted by importing RpGit again.
+    of data. If git is installed, it can be called by 'import rpgit'. As a result, git can be 
+    initiated using start_git(). A git repository will be created in the CWD, if it doesn't already exist. 
+    Input datasets, .py, .ipynb and .pkl files in the CWD will be version controlled. 
+    Version control can be paused in the middle of the script
+    by calling stop_git() and restarted by calling start_git() again.
     """
 
     def __init__(self, loci):
@@ -666,14 +667,14 @@ class Database:
         """
         
         if __builtin__.git:
-            import RpGit
+            import rpgit
         else:
             warnings.warn('Version control off')    
         generators = []
         for input_filename in input_filenames_list:
             if __builtin__.git:
-                import RpGit
-                RpGit.gitAdd(input_filename)
+                import rpgit
+                rpgit.gitAdd(input_filename)
             generators.append(parse_input(input_filename, 'gb'))
             for generator in generators:
                 for record in generator:
@@ -683,9 +684,9 @@ class Database:
                     elif len(record.features) == 1 and not record.features[0].type == 'source':
                         self.records.append(dwindled_record)
         if __builtin__.git:
-            import RpGit
+            import rpgit
             comment = "%i genbank/embl data file(s) from %s" % (len(input_filenames_list), time.asctime())
-            RpGit.gitCommit(comment)          
+            rpgit.gitCommit(comment)          
             
         
         
@@ -725,7 +726,7 @@ class Database:
         """
         
         if __builtin__.git:
-            import RpGit
+            import rpgit
         else:
             warnings.warn('Version control off')
         
@@ -738,8 +739,8 @@ class Database:
                     count = serial+1
         for input_filename in input_filenames:
             if __builtin__.git:
-                import RpGit
-                RpGit.gitAdd(input_filename)
+                import rpgit
+                rpgit.gitAdd(input_filename)
             denovo = SeqIO.parse(input_filename, format)
             for record in denovo:
                 source = SeqFeature(FeatureLocation(0, len(record.seq)), type='source', strand=1)
@@ -757,9 +758,9 @@ class Database:
                 self.records.append(record)
                 
         if __builtin__.git:
-            import RpGit
+            import rpgit
             comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
-            RpGit.gitCommit(comment)
+            rpgit.gitCommit(comment)
                
                
                
@@ -2626,10 +2627,10 @@ def pickle_db(db, pickle_file_name):
         pickle.dump(db, output)
         output.close()
         if __builtin__.git:
-            import RpGit
-            RpGit.gitAdd(pickle_file_name)
+            import rpgit
+            rpgit.gitAdd(pickle_file_name)
             comment = "A pickled Database from %s" % time.asctime()
-            RpGit.gitCommit(comment) 
+            rpgit.gitCommit(comment) 
             
         return pickle_file_name
     
