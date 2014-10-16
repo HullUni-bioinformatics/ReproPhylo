@@ -18,11 +18,14 @@ if False:
     
     
     Developed with:
-    Python 2.7.6
+    CPython 2.7.6
+    IPython 1.2.1
     ete2 2.2rev1056
     biopython 1.64
     dendropy 3.12.0
     cloud 2.8.5
+    numpy 1.8.2
+    matplotlib 1.3.1
     
     RAxML 8
     Phylobayes
@@ -36,9 +39,12 @@ if False:
 
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit
+import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast
 import subprocess as sub
+#import cloud.serialization.cloudpickle as pickle
 from Bio.Seq import Seq
+import numpy as np
+import matplotlib.pyplot as plt
 from Bio.Alphabet import IUPAC
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
@@ -50,6 +56,119 @@ from Bio.Align import MultipleSeqAlignment
 from Bio.SeqUtils import GC
 from ete2 import *
 import __builtin__
+
+
+
+##############################################################################################
+if False:
+    """Tools for loci explorations in a GenBank File"""
+##############################################################################################
+
+
+
+def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None):
+    
+   stdout = sys.stdout
+   if  loci_report: 
+        sys.stdout = open(loci_report, 'w')
+    
+   genbank_synonyms = ast.literal_eval(open('genbank_synonyms','r').read())
+    
+   # Open GenBank file
+   MelPCgenes = open(genbank_filename, 'rU')
+   
+   gene_dict = {} #set up a gene_dict dictionary
+   
+   # For each record
+   for record in SeqIO.parse(MelPCgenes, 'genbank') :
+   
+      # Grab the entire sequence
+      #seq = str(record.seq)  ## what is this actually used for? Nothing seems to happen on disabling it
+   
+      # Look at all features for this record
+      for feature in record.features:
+         
+         # If it's a CDS or rRNA...
+         if feature.type == 'CDS' or feature.type == 'rRNA':
+   
+            # If it contains some attribute called 'gene' save that
+            if 'gene' in feature.qualifiers:
+               geneName = feature.qualifiers['gene'][0]
+               geneName.replace(',',';')
+               if feature.type+','+geneName in gene_dict:
+                   gene_dict[feature.type+','+geneName]+=1
+               else:    
+                   gene_dict[feature.type+','+geneName]=1
+               #print(geneName)
+               
+            # Else if it contains some attribute called 'product' save that instead
+            elif 'product' in feature.qualifiers:
+               geneName = feature.qualifiers['product'][0]
+               geneName.replace(',',';')
+               if feature.type+','+geneName in gene_dict:
+                   gene_dict[feature.type+','+geneName]+=1
+               else:    
+                   gene_dict[feature.type+','+geneName]=1
+               #print(geneName)
+               
+            # Otherwise, quit.
+            else:
+               print 'ERROR when parsing feature: could not find either gene or product'
+               print feature.qualifiers
+               quit()
+   #print(gene_dict)
+       
+   #sorting happens via a list
+   
+   sorted_gene_names = gene_dict.items()
+   sorted_gene_names.sort(key = lambda i: i[0].lower())
+   control_file_lines = {}
+   
+   
+   print('\n' + "There are " + str(len(sorted_gene_names)) + " gene names (or gene product names) detected")
+   print("----------------------------------")
+   print("Gene and count sorted by gene name")
+   print("----------------------------------")
+   
+   for key, value in sorted_gene_names:
+           #print key, value
+           print(str(value) +" instances of " + key)
+           feature_type = key.split(',')[0]
+           alias = key.split(',')[1]
+           gen_group = None
+           for group in genbank_synonyms:
+               if alias in group:
+                   gen_group = group
+           if gen_group:
+               if gen_group[0] in control_file_lines.keys():
+                   control_file_lines[gen_group[0]].append(alias)
+               else:
+                   control_file_lines[gen_group[0]] = [feature_type, alias]
+           else:
+               name = alias.replace(' ','_')
+               control_file_lines[name] = [feature_type, alias]
+                    
+   control_file_handle = open(control_filename, 'wt')
+   for line in sort(control_file_lines.keys()):  
+       control_file_handle.write('dna,%s,%s'%(control_file_lines[line][0],line))
+       for a in control_file_lines[line][1:]: 
+          control_file_handle.write(',%s'%a)
+       control_file_handle.write('\n')
+                            
+   control_file_handle.close()                 
+   
+   print("-------------------------------")
+   print("Gene and count sorted by counts")
+   print("-------------------------------")
+   sorted_gene_names.sort(key = lambda i: int(i[1]), reverse=True)
+   for key, value in sorted_gene_names:
+           #print key, value
+           print(str(value) +" instances of " + key)
+   sys.stdout = stdout
+   
+                    
+                    
+
 
 
 
@@ -618,18 +737,45 @@ class Database:
                 raise IOError("File %s has no valid loci of format char_type,feature_type,name,aliases"%loci)
                 
                 
+            loci_dict = {}
             loci_list = []
-            
             for line in [line.rstrip() for line in open(loci, 'r').readlines() if len(line.rstrip()) > 0]:
                 if len(line.split(',')) < 4:
                     raise IOError("The line %s in file %s is missing arguments. Needs at least char_type,feature_type,name,aliases"%
                                   (line.rstrip(), loci))
                 else:
-                    char_type = line.split(',')[0]
-                    feature_type = line.split(',')[1]
-                    name = line.split(',')[2]
-                    alises = line.split(',')[3:]
-                    loci_list.append(Locus(char_type,feature_type,name,alises))
+                    group = None
+                    try:
+                        group = int(line.rstrip().split(',')[-1])
+                    except:
+                        pass
+                    
+                    if group:
+                        locus_exists = False
+                        for name in loci_dict:
+                            if 'group' in loci_dict[name].keys() and loci_dict[name]['group'] == group:
+                                loci_dict[name]['aliases'] += line.split(',')[3:-1]
+                                locus_exists = True
+                        if not locus_exists:
+                            loci_dict[line.split(',')[2]] = {'group': int(line.rstrip().split(',')[-1]),
+                                                             'char_type': line.split(',')[0],
+                                                             'feature_type': line.split(',')[1],
+                                                             'aliases': line.split(',')[3:-1]
+                                                             }
+                    else:
+                        loci_dict[line.split(',')[2]] = {'group': None,
+                                                         'char_type': line.split(',')[0],
+                                                         'feature_type': line.split(',')[1],
+                                                         'aliases': line.split(',')[3:]
+                                                         }
+                        
+                    
+                    
+            for name in loci_dict:
+                loci_list.append(Locus(loci_dict[name]['char_type'],
+                                       loci_dict[name]['feature_type'],
+                                       name,
+                                       loci_dict[name]['aliases']))
             self.loci = loci_list
             print 'Read the following loci from file %s:'%loci
             for l in self.loci:
