@@ -140,10 +140,10 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
                if alias in group:
                    gen_group = group
            if gen_group:
-               if gen_group[0] in control_file_lines.keys():
-                   control_file_lines[gen_group[0]].append(alias)
+               if gen_group[0].replace(' ','_') in control_file_lines.keys():
+                   control_file_lines[gen_group[0].replace(' ','_')].append(alias)
                else:
-                   control_file_lines[gen_group[0]] = [feature_type, alias]
+                   control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, gen_group[0].replace(' ','_'), alias]
            else:
                name = alias.replace(' ','_')
                control_file_lines[name] = [feature_type, alias]
