@@ -1,0 +1,124 @@
+dna,rRNA,12S_ribosomal_RNA,12S ribosomal RNA,12S rRNA
+dna,rRNA,16S_ribosomal_RNA,16S ribosomal RNA,16S rRNA
+dna,rRNA,18s,18S ribosomal RNA
+dna,rRNA,28s,28S ribosomal RNA
+dna,rRNA,5.8S_ribosomal_RNA,5.8S ribosomal RNA
+dna,CDS,ADNP,ADNP
+dna,CDS,AHR,AHR
+dna,CDS,AKAP9,AKAP9
+dna,CDS,AMEL,AMEL
+dna,CDS,ATP6,ATP6,atp6
+dna,CDS,ATP8,ATP8,atp8
+dna,CDS,Amcr-DAB1,Amcr-DAB1
+dna,CDS,Amcr-DAB2,Amcr-DAB2
+dna,CDS,Amcr-DAB3,Amcr-DAB3
+dna,CDS,Amcr-DAB4,Amcr-DAB4
+dna,CDS,Amcr-DAB5,Amcr-DAB5
+dna,CDS,Amcr-UA,Amcr-UA
+dna,CDS,Amcr-UB,Amcr-UB
+dna,CDS,BACH1,BACH1
+dna,CDS,BDNF,BDNF
+dna,CDS,BHLHB2,BHLHB2
+dna,CDS,BMP2,BMP2
+dna,CDS,BNDF,BNDF
+dna,CDS,CAND1,CAND1
+dna,CDS,CARD4,CARD4
+dna,CDS,CILP,CILP
+dna,CDS,CRiSP-Igu-1,CRiSP-Igu-1
+dna,CDS,CRiSP-Igu-2,CRiSP-Igu-2
+dna,CDS,CVF-Igu-1,CVF-Igu-1
+dna,CDS,CXCR4,CXCR4
+dna,CDS,C_mos,C-mos,c-mos,C-MOS
+dna,CDS,Cosu-UA,Cosu-UA
+dna,CDS,Cosu-UB,Cosu-UB
+dna,CDS,Ctcl-UA,Ctcl-UA
+dna,CDS,Ctde-UA,Ctde-UA
+dna,CDS,Cyca-UA,Cyca-UA
+dna,CDS,Cyco-UA,Cyco-UA
+dna,CDS,Cyri-UA,Cyri-UA
+dna,CDS,Cystatin-Igu-1,Cystatin-Igu-1
+dna,CDS,Cystatin-Igu-2,Cystatin-Igu-2
+dna,CDS,Cystatin-Igu-3,Cystatin-Igu-3
+dna,CDS,DNAH3,DNAH3
+dna,CDS,DNA_polymerase_alpha_catalytic_subunit,DNA polymerase alpha catalytic subunit
+dna,CDS,ECEL1,ECEL1
+dna,CDS,ENC1,ENC1
+dna,CDS,FSHR,FSHR
+dna,CDS,FSTL5,FSTL5
+dna,CDS,GALR1,GALR1
+dna,CDS,GAPDH,GAPDH,gapdh
+dna,CDS,GARS-AIRS-GART,GARS-AIRS-GART
+dna,CDS,GHSR,GHSR
+dna,CDS,GPR149,GPR149
+dna,CDS,GPR37,GPR37
+dna,CDS,HLCS,HLCS
+dna,CDS,HOXA13,HOXA13
+dna,CDS,INHBA,INHBA
+dna,CDS,Igig-UB,Igig-UB
+dna,CDS,JUN,JUN
+dna,CDS,LRRN1,LRRN1
+dna,CDS,MKL1',MKL1'
+dna,CDS,MLL,MLL
+dna,CDS,MSH6,MSH6
+dna,CDS,NGFB,NGFB
+dna,CDS,NKTR,NKTR
+dna,CDS,NT-3,NT-3
+dna,CDS,NT3,NT3
+dna,CDS,NTF3,NTF3
+dna,CDS,PNN,PNN
+dna,CDS,PRLR,PRLR
+dna,CDS,PTGER4,PTGER4
+dna,CDS,R35,R35
+dna,CDS,RAG-1,RAG-1
+dna,CDS,RAG1,RAG1
+dna,CDS,RAG2,RAG2
+dna,CDS,RNF103,RNF103
+dna,CDS,RT,RT
+dna,CDS,SLC30A1,SLC30A1
+dna,CDS,SLC8A1,SLC8A1
+dna,CDS,SLC8A3,SLC8A3
+dna,CDS,SNCAIP,SNCAIP
+dna,CDS,TRAF6,TRAF6
+dna,CDS,TSHZ1,TSHZ1
+dna,CDS,UBN1,UBN1
+dna,CDS,VCPIP,VCPIP
+dna,CDS,ZEB2,ZEB2
+dna,CDS,ZFP36L1,ZFP36L1
+dna,CDS,ZHFX1b,ZHFX1b
+dna,CDS,alpha_actin,alpha actin
+dna,CDS,alpha_enolase,alpha enolase
+dna,CDS,amelogenin_T2L_splicing_form_2,amelogenin T2L splicing form 2
+dna,CDS,amelogenin_T2S_splicing_form_1,amelogenin T2S splicing form 1
+dna,CDS,citrate_synthase,citrate synthase
+dna,CDS,coi,COI,cox I,COX1
+dna,CDS,coii,cox II,COX2
+dna,CDS,coiii,COIII,cox III,COX3
+dna,CDS,cryba2,cryba2
+dna,CDS,crygn,crygn
+dna,CDS,cygb-1,cygb-1
+dna,CDS,cygb-2,cygb-2
+dna,CDS,cytb,cytb,CYTB,Cytb,cytochrome B,cytochrome b
+dna,CDS,distal-less,distal-less
+dna,CDS,ha1,ha1
+dna,CDS,histone_H3a,histone H3a
+dna,CDS,kunitz-Igu-1,kunitz-Igu-1
+dna,CDS,lactate_dehydrogenase_A,lactate dehydrogenase A
+dna,CDS,lactate_dehydrogenase_B,lactate dehydrogenase B
+dna,CDS,leucine_zipper_tumor_suppressor_1,leucine zipper tumor suppressor 1
+dna,CDS,mb,mb
+dna,CDS,muscle-type_(A4)_lactate_dehydrogenase,muscle-type (A4) lactate dehydrogenase
+dna,CDS,muscle-type_lactate_dehydrogenase,muscle-type lactate dehydrogenase
+dna,CDS,nad1,nadh1,ND1
+dna,CDS,nad2,nadh2,ND2
+dna,CDS,nad3,nadh3,ND3
+dna,CDS,nad4,NADH dehydrogenase subunit 4,nadh4,ND4
+dna,CDS,nad4l,nadh4L,ND4L
+dna,CDS,nad5,nadh5,ND5
+dna,CDS,nad6,nadh6,ND6
+dna,CDS,pancreatic_ribonuclease_precursor,pancreatic ribonuclease precursor
+dna,CDS,pin,pin
+dna,CDS,pp,pp
+dna,CDS,protein_tyrosine_phosphatase_non-receptor_type_12,protein tyrosine phosphatase non-receptor type 12
+dna,CDS,prt,prt
+dna,CDS,src,src
+dna,CDS,sws1,sws1
