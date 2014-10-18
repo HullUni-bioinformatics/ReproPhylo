@@ -143,7 +143,7 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
                if gen_group[0].replace(' ','_') in control_file_lines.keys():
                    control_file_lines[gen_group[0].replace(' ','_')].append(alias)
                else:
-                   control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, gen_group[0].replace(' ','_'), alias]
+                   control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, alias]
            else:
                name = alias.replace(' ','_')
                control_file_lines[name] = [feature_type, alias]
@@ -244,9 +244,6 @@ class Concatenation:
     Alignments with the following names: MuscleDefaults@dummyTrimMethod are prefered
     """
     
-    name = 'NotSet'
-    loci = []
-    otu_meta = 'NotSet'
     concat_must_have_all_of = []
     concat_must_have_one_of = []
     define_trimmed_alns = [] #should be Locus_name@Alignment_method_name@Trimming_mathod_name
@@ -254,9 +251,9 @@ class Concatenation:
     feature_id_dict = {}
     
     def __init__(self,
-                 name = name,
-                 loci = loci,
-                 otu_meta = otu_meta,
+                 name,
+                 loci,
+                 otu_meta,
                  concat_must_have_all_of = concat_must_have_all_of,
                  concat_must_have_one_of = concat_must_have_one_of,
                  define_trimmed_alns = define_trimmed_alns):
@@ -1178,7 +1175,12 @@ class Project:
                     keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
                 else:
                     raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
-
+            
+            print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
+            
+            if len(included_individuals.keys()) < 4:
+                raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
+            
             for individual in included_individuals.keys():
                 sequence = ''
                 for key in keys_of_trimmed_alignments_to_use_in_concat:
