@@ -672,9 +672,59 @@ def read_feature_quals_from_tab_csv(csv_filename):
                 csv_info[line[0]]['features'][line[feature_id_col]][header[i]] = line[i].split(';')
     return csv_info
 
-                
-            
-                
+def count_positions(aln_column):
+    counts = {}
+    for i in aln_column:
+        if i in counts.keys():
+            counts[i] += 1
+        else:
+            counts[i] = 1
+    return counts
+
+def mean_gap_prop(aln_obj):
+    total_gaps = 0
+    prop_list = []
+    non_uniform_count = 0
+    parsimony_informative = 0
+    for i in range(aln_obj.get_alignment_length()):
+        total_gaps += aln_obj[:, i].count('-')
+        prop_list.append(aln_obj[:, i].count('-')/float(len(aln_obj)))
+        if len(count_positions(aln_obj[:, i]).keys()) == 1:
+            non_uniform_count += 1
+        elif (len(count_positions(aln_obj[:, i]).keys()) == 2 and
+              '-' in  count_positions(aln_obj[:, i]).keys()):
+            non_uniform_count += 1
+        if len([p for p in count_positions(aln_obj[:, i]).keys() if (p != '-' and  count_positions(aln_obj[:, i])[p] > 1)]) > 1:
+            parsimony_informative += 1
+    mean_gap_prop = sum(prop_list)/aln_obj.get_alignment_length()
+    return (mean_gap_prop, non_uniform_count, parsimony_informative)
+
+def count_undetermined_lines(aln_obj):
+    count = 0
+    for seq in aln_obj:
+        if str(seq.seq).count('-') == aln_obj.get_alignment_length():
+            count += 1
+    return count
+
+def count_collapsed_aln_seqs(aln_obj):
+    count = 1
+    seen_seqs = [str(aln_obj[0].seq)]
+    for seq in aln_obj[1:]:
+        str_seq = str(seq.seq)
+        if len([s for s in seen_seqs if (str_seq in s or s in str_seq or s == str_seq)]) == 0:
+            count += 1
+        seen_seqs.append(str_seq)
+    return count
+
+def aln_summary(aln_obj):
+    lines = ["Alignment length: %i" % aln_obj.get_alignment_length(),
+             "Number of rows: %i" % len(aln_obj),
+             "Average gap prop.: %f\nNon-uniform columns: %i\nParsimony informative: %i"
+             %mean_gap_prop(aln_obj),
+             "Undetermined sequences: %i"%count_undetermined_lines(aln_obj),
+             "Collapsed seqeunce count: %i"%count_collapsed_aln_seqs(aln_obj)
+             ]
+    return [lines, len(aln_obj), count_undetermined_lines(aln_obj), count_collapsed_aln_seqs(aln_obj)]        
             
             
 
@@ -777,7 +827,7 @@ class Project:
             print 'Read the following loci from file %s:'%loci
             for l in self.loci:
                 print str(l)
-     
+            self.aln_summaries = []
                 
                 
     def __str__(self):
@@ -1695,7 +1745,26 @@ class Project:
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
                         #align = codon_aln
                     method_files = glob.glob(method.id+'_*')
-                    self.alignments[locus.name+'@'+method.method_name] = align
+                    [summary_lines, num_lines, num_undeter, num_collapsed_aln_seqs] = aln_summary(align)
+                    summary = 'Alignment name: '+locus.name+'@'+method.method_name+'\n'
+                    for line in summary_lines:
+                        summary += line+'\n'
+                    if num_lines < 4:
+                        line = 'Alignment %s has less than 4 sequences and will be dropped'%locus.name+'@'+method.method_name
+                        print line
+                        summary += line+'\n'
+                    elif num_undeter > 0:
+                        line = 'Alignment %s has undetermined sequences and will be dropped'%locus.name+'@'+method.method_name
+                        print line
+                        summary += line+'\n'
+                    elif num_collapsed_aln_seqs < 4:
+                        line = 'Alignment %s has less than 4 unique sequences and will be dropped'%locus.name+'@'+method.method_name
+                        print line
+                        summary += line+'\n'
+                        
+                    else:
+                        self.alignments[locus.name+'@'+method.method_name] = align
+                    self.aln_summaries.append(summary)
                 method.timeit.append(time.time())
                 method.timeit.append(method.timeit[2]-method.timeit[1])
                 for f in method_files:
@@ -2046,7 +2115,26 @@ class Project:
                     for locus in self.loci:
                         if locus.name == locus_name and locus.char_type == 'prot':
                             alphabet = IUPAC.protein
-                    self.trimmed_alignments[aln] = AlignIO.read(StringIO(stdout), "fasta",  alphabet=alphabet)
+                    align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=alphabet)
+                    [summary_lines, num_lines, num_undeter, num_collapsed_aln_seqs] = aln_summary(align)
+                    summary = 'Alignment name: '+aln+'\n'
+                    for line in summary_lines:
+                        summary += line+'\n'
+                    if num_lines < 4:
+                        line = 'Alignment %s has less than 4 sequences and will be dropped'%aln
+                        print line
+                        summary += line+'\n'
+                    elif num_undeter > 0:
+                        line = 'Alignment %s has undetermined sequences and will be dropped'%aln
+                        print line
+                        summary += line+'\n'
+                    elif num_collapsed_aln_seqs < 4:
+                        line = 'Alignment %s has less than 4 unique sequences and will be dropped'%aln
+                        print line
+                        summary += line+'\n'
+                    else:
+                        self.trimmed_alignments[aln] = align
+                    self.aln_summaries.append(summary)
             for file_name in os.listdir(os.curdir):
                         if m.id.partition('_')[0] in file_name:
                             os.remove(file_name)
@@ -2082,6 +2170,13 @@ class AlnConf:
                 for locus in pj.loci:
                     if locus_name == locus.name:
                         self.loci.append(locus)
+        mutable_loci_list = []
+        for locus in self.loci: 
+            if len(pj.records_by_locus[locus.name]) < 4:
+                print "%s have less than 4 sequences and will be dropped from this conf object. Don't use it in a concatenation"%locus.name
+            else:
+                mutable_loci_list.append(locus)
+        self.loci = mutable_loci_list
         self.CDS_proteins = {}
         self.CDS_in_frame = {}
         self.aln_input_strings = {}
@@ -2093,7 +2188,8 @@ class AlnConf:
         if pj.records_by_locus == {}:
             pj.extract_by_locus()
         for key in pj.records_by_locus.keys():
-            SeqIO.write(pj.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
+            if key in [l.name for l in self.loci]:
+                SeqIO.write(pj.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
         for locus in self.loci:
             # put default input file filename and string in the AlnConf object
             input_filename=self.id+'_'+locus.name+'.fasta'
@@ -2721,7 +2817,12 @@ def report_methods(pj, figs_folder):
         
         report_lines += ('</pre>', '','') 
         
-        
+        if len(pj.aln_summaries)>0:
+            title = 'Alignment summaries'
+            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+            for summary in pj.aln_summaries:
+                report_lines += ['',summary,'']
+                
         if len(pj.alignments.keys())>0:                    
             title = 'Alignment statistics before trimming'
             report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
