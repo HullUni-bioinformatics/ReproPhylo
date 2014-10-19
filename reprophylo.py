@@ -1750,15 +1750,15 @@ class Project:
                     for line in summary_lines:
                         summary += line+'\n'
                     if num_lines < 4:
-                        line = 'Alignment %s has less than 4 sequences and will be dropped'%locus.name+'@'+method.method_name
+                        line = 'Alignment %s has less than 4 sequences and will be dropped'%(locus.name+'@'+method.method_name)
                         print line
                         summary += line+'\n'
                     elif num_undeter > 0:
-                        line = 'Alignment %s has undetermined sequences and will be dropped'%locus.name+'@'+method.method_name
+                        line = 'Alignment %s has undetermined sequences and will be dropped'%(locus.name+'@'+method.method_name)
                         print line
                         summary += line+'\n'
                     elif num_collapsed_aln_seqs < 4:
-                        line = 'Alignment %s has less than 4 unique sequences and will be dropped'%locus.name+'@'+method.method_name
+                        line = 'Alignment %s has less than 4 unique sequences and will be dropped'%(locus.name+'@'+method.method_name)
                         print line
                         summary += line+'\n'
                         

@@ -1,5 +1,3 @@
-dna,rRNA,12S_ribosomal_RNA,12S ribosomal RNA,12S rRNA
-dna,rRNA,16S_ribosomal_RNA,16S ribosomal RNA,16S rRNA
 dna,rRNA,18s,18S ribosomal RNA
 dna,rRNA,28s,28S ribosomal RNA
 dna,rRNA,5.8S_ribosomal_RNA,5.8S ribosomal RNA
@@ -7,8 +5,6 @@ dna,CDS,ADNP,ADNP
 dna,CDS,AHR,AHR
 dna,CDS,AKAP9,AKAP9
 dna,CDS,AMEL,AMEL
-dna,CDS,ATP6,ATP6,atp6
-dna,CDS,ATP8,ATP8,atp8
 dna,CDS,Amcr-DAB1,Amcr-DAB1
 dna,CDS,Amcr-DAB2,Amcr-DAB2
 dna,CDS,Amcr-DAB3,Amcr-DAB3
@@ -60,6 +56,19 @@ dna,CDS,LRRN1,LRRN1
 dna,CDS,MKL1',MKL1'
 dna,CDS,MLL,MLL
 dna,CDS,MSH6,MSH6
+dna,CDS,MT-ATP6,ATP6,atp6
+dna,CDS,MT-ATP8,ATP8,atp8
+dna,CDS,MT-CO1,COI,cox I,COX1
+dna,CDS,MT-CO2,cox II,COX2
+dna,CDS,MT-CO3,COIII,cox III,COX3
+dna,CDS,MT-CYB,cytb,CYTB,Cytb,cytochrome B,cytochrome b
+dna,CDS,MT-ND1,nadh1,ND1
+dna,CDS,MT-ND2,nadh2,ND2
+dna,CDS,MT-ND3,nadh3,ND3
+dna,CDS,MT-ND4,NADH dehydrogenase subunit 4,nadh4,ND4
+dna,CDS,MT-ND4L,nadh4L,ND4L
+dna,CDS,MT-ND5,nadh5,ND5
+dna,CDS,MT-ND6,nadh6,ND6
 dna,CDS,NGFB,NGFB
 dna,CDS,NKTR,NKTR
 dna,CDS,NT-3,NT-3
@@ -90,14 +99,10 @@ dna,CDS,alpha_enolase,alpha enolase
 dna,CDS,amelogenin_T2L_splicing_form_2,amelogenin T2L splicing form 2
 dna,CDS,amelogenin_T2S_splicing_form_1,amelogenin T2S splicing form 1
 dna,CDS,citrate_synthase,citrate synthase
-dna,CDS,coi,COI,cox I,COX1
-dna,CDS,coii,cox II,COX2
-dna,CDS,coiii,COIII,cox III,COX3
 dna,CDS,cryba2,cryba2
 dna,CDS,crygn,crygn
 dna,CDS,cygb-1,cygb-1
 dna,CDS,cygb-2,cygb-2
-dna,CDS,cytb,cytb,CYTB,Cytb,cytochrome B,cytochrome b
 dna,CDS,distal-less,distal-less
 dna,CDS,ha1,ha1
 dna,CDS,histone_H3a,histone H3a
@@ -108,17 +113,12 @@ dna,CDS,leucine_zipper_tumor_suppressor_1,leucine zipper tumor suppressor 1
 dna,CDS,mb,mb
 dna,CDS,muscle-type_(A4)_lactate_dehydrogenase,muscle-type (A4) lactate dehydrogenase
 dna,CDS,muscle-type_lactate_dehydrogenase,muscle-type lactate dehydrogenase
-dna,CDS,nad1,nadh1,ND1
-dna,CDS,nad2,nadh2,ND2
-dna,CDS,nad3,nadh3,ND3
-dna,CDS,nad4,NADH dehydrogenase subunit 4,nadh4,ND4
-dna,CDS,nad4l,nadh4L,ND4L
-dna,CDS,nad5,nadh5,ND5
-dna,CDS,nad6,nadh6,ND6
 dna,CDS,pancreatic_ribonuclease_precursor,pancreatic ribonuclease precursor
 dna,CDS,pin,pin
 dna,CDS,pp,pp
 dna,CDS,protein_tyrosine_phosphatase_non-receptor_type_12,protein tyrosine phosphatase non-receptor type 12
 dna,CDS,prt,prt
+dna,rRNA,rrnL,16S ribosomal RNA,16S rRNA
+dna,rRNA,rrnS,12S ribosomal RNA,12S rRNA
 dna,CDS,src,src
 dna,CDS,sws1,sws1
