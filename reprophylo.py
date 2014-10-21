@@ -40,6 +40,7 @@ if False:
 
 from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast, gb_syn
+import HTML, inspect, shutil
 import subprocess as sub
 #import cloud.serialization.cloudpickle as pickle
 from Bio.Seq import Seq
@@ -365,8 +366,11 @@ def platform_report():
     import pkg_resources
     modules = []
     for i in ('ete2','biopython','dendropy','cloud'):
-        modules.append(i+' version: '+
-                            pkg_resources.get_distribution(i).version)
+        try:
+            modules.append(i+' version: '+
+                                pkg_resources.get_distribution(i).version)
+        except:
+            pass
     return(['Platform: '+platform.platform(aliased=0, terse=0),
             'Processor: '+platform.processor(),
             'Python build: '+platform.python_build()[0] + platform.python_build()[1],
@@ -681,7 +685,7 @@ def count_positions(aln_column):
             counts[i] = 1
     return counts
 
-def mean_gap_prop(aln_obj):
+def global_aln_stats(aln_obj):
     total_gaps = 0
     prop_list = []
     non_uniform_count = 0
@@ -719,10 +723,10 @@ def count_collapsed_aln_seqs(aln_obj):
 def aln_summary(aln_obj):
     lines = ["Alignment length: %i" % aln_obj.get_alignment_length(),
              "Number of rows: %i" % len(aln_obj),
-             "Average gap prop.: %f\nNon-uniform columns: %i\nParsimony informative: %i"
-             %mean_gap_prop(aln_obj),
-             "Undetermined sequences: %i"%count_undetermined_lines(aln_obj),
-             "Collapsed seqeunce count: %i"%count_collapsed_aln_seqs(aln_obj)
+             "Unique sequences: %i"%count_collapsed_aln_seqs(aln_obj),
+             "Average gap prop.: %f\nVariable columns: %i\nParsimony informative: %i"
+             %global_aln_stats(aln_obj),
+             "Undetermined sequences: %i"%count_undetermined_lines(aln_obj)
              ]
     return [lines, len(aln_obj), count_undetermined_lines(aln_obj), count_collapsed_aln_seqs(aln_obj)]        
             
@@ -760,6 +764,7 @@ class Project:
         Project object with the loci coi,18S,
         """
         self.records = []
+        self.starttime = str(time.asctime())
         self.loci = loci
         self.records_by_locus = {}
         self.concatenations = []
@@ -1557,7 +1562,7 @@ class Project:
             for g in self.loci:
                 loci_names.append(g.name)
             linewriter.writerow(['species']+loci_names)
-            for organism in species_vs_loci.keys():
+            for organism in sorted(list(species_vs_loci.keys())):
                 line = [organism]
                 for name in loci_names:
                     if name in species_vs_loci[organism].keys():
@@ -2550,7 +2555,7 @@ class RaxmlConf:
 from pylab import *
 import random
 
-def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
+def draw_boxplot(dictionary, y_axis_label, figs_folder, scale): #'locus':[values]
     import numpy as np
     import matplotlib.pyplot as plt
     items = dictionary.items()
@@ -2559,6 +2564,7 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     data = [locus[1] for locus in items]
         
     fig, ax1 = plt.subplots()
+    fig.figsize = (scale, 3)
     #plt.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
 
     #bp = plt.boxplot(data, widths=0.75, patch_artist=True)
@@ -2609,60 +2615,165 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     close('all')
     return figs_folder + '/' + name+'.png'
     
-def report_methods(pj, figs_folder):
-        report_lines = ['<html>','<head>','<h1>']
+#################################################################################
+def report_methods(pj, figs_folder, output_directory):
+#################################################################################
+        """
+        Main HTML reporting function. This function iterates over the 
+        Project's attributes and generate appropriate html formated report lines.
+        
+        pj -               The Project object
+        
+        figs_folder -      The directory to which tree figures were saved. This is
+                           specified in the annotate Project method
+                           
+        output_directory - The directory to which this report will be written.It 
+                           can be inherited from the publish function which uses 
+                           this function.
+        """
+        
+        #========================================================================
+        #                                   HEAD
+        #========================================================================
+        
+        # Checking if 'report_methods' was called by 'publish' in order to infer
+        # which folders to create and what errors to raise for existing 
+        # directories. If we were called by 'publish' we should allow 
+        # output_directory to exist because 'publish' has just created it.
+        # 'publish' would have also raised an error if it existed before.
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        callername = calframe[1][3]
+
+        # Here we manage mkdir and error raising for preexisting 
+        # output_directory, based of the caller function
+        if os.path.isdir(output_directory) and callername != 'publish':
+            raise RuntimeError('%s already exists'%output_directory) 
+        else:
+            # This will make output_directory if it doesnt exist and
+            # will add a subdirectory 'files' which will store the
+            # stylesheet file and the figure files
+            os.makedirs('%s/files'%output_directory)
+        
+        # This will contain the text that points to the stylesheet file
+        # I have named it rp.css. We need to add something that writes
+        # it here. Or that get it from the source directory and places it
+        # in /files
+        
+        css_line = '<link rel="stylesheet" type="text/css" href="files/rp.css">'
+
+        # This list will contain the report lines/ tables as values. We will append
+        # each new report line to it
+        report_lines = ['<html>','<head>',css_line,'<h1>']
     
-        head = 'reprophylo analysis from '+str(time.asctime())
-        #=====================================================
+        # Main report title, will print the time in which the 'Project' object
+        # was initiated (not the time when the report was made as in previous 
+        # versions.
+        head = 'reprophylo analysis from '+pj.starttime
+        
+
         report_lines.append(head)
         report_lines += ['</h1>','</head>','<body>','']
+                
+        #========================================================================
+        #                                   BODY
+        #========================================================================
+
         
+        #############################  section 1:   DATA  #######################
         report_lines += ['<h2>','Data','</h2>', '']
         
-        title = 'species representation in sequence data'.title()
-        report_lines += ('<h3>', title, '</h3>', '', '<pre>')
-        #--------------------------------------------------------
         
+        # Species over loci table
+        #------------------------------------------------------------------------
+        title = 'species representation in sequence data'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
+        
+        
+        # This will write a CSV file of the times each locus occures for each 
+        # species. The species are sorted in alphabetical order. The CSV will 
+        # be writen to 'outfile_name'. After 'outfile_name' is processed it will
+        # be deleted.The CSV will be read with the csv module and the resulting
+        # list of lists will be made into a table using HTML and than added to 
+        # 'report_lines'. The species an gene counts are made by 'species_vs_loci'
+        # based on the sequences record objects (biopython) found in pj.records.
+        # pj.records is a list of SeqRecord objects
         outfile_name= str(random.randint(1000,2000))
         pj.species_vs_loci(outfile_name)
         with open(outfile_name, 'rb') as csvfile:
             sp_vs_lc = list(csv.reader(csvfile, delimiter='\t', quotechar='|'))
-            field_sizes = []
-            for i in range(len(sp_vs_lc[0])):
-                lengths = []
-                for row in sp_vs_lc:
-                    lengths.append(len(row[i]))
-                field_sizes.append(max(lengths))
-            for row in sp_vs_lc:
-                string = ''
-                for i in range(len(row)):
-                    string += row[i].ljust(field_sizes[i]+3)
-                report_lines.append(string)
+            report_lines += ['',
+                             HTML.table(sp_vs_lc[1:], header_row=sp_vs_lc[0]),
+                             '']
+            # The following writes a pre text of the same thing
+            #field_sizes = []
+            #for i in range(len(sp_vs_lc[0])):
+            #    lengths = []
+            #    for row in sp_vs_lc:
+            #        lengths.append(len(row[i]))
+            #    field_sizes.append(max(lengths))
+            #for row in sp_vs_lc:
+            #    string = ''
+            #    for i in range(len(row)):
+            #        string += row[i].ljust(field_sizes[i]+3)
+            #    report_lines.append(string)
         
         os.remove(outfile_name)
         
+                
+        # Sequence statistic plots
+        #------------------------------------------------------------------------
+        title = 'Sequence statistic plots'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
         
+        # This will plot 4 box plot figures representing the distribution of seq
+        # length, GC content, %ambiguity in nuc and prot seqs for each locus.
         if len(pj.records_by_locus.keys())>0:
-            scale = str(len(pj.records_by_locus.keys())*200)
+            
+            # This will determine the with of the figure, 0.5' per locus
+            scale = str(len(pj.records_by_locus.keys())*0.5)
+            
+            # This will make a list of seq length for each locus. Seq length are calced
+            # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
+            # dict with loci names as keys, and lists of SeqReocrd objects as values
             lengths_dict = {}
             for locus_name in pj.records_by_locus.keys():
                 lengths_dict[locus_name] = []
                 for record in pj.records_by_locus[locus_name]:
                     lengths_dict[locus_name].append(len(record.seq))
-            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', figs_folder)
-            title = 'Distribution of sequence lengths'
-            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
-            if os.path.isfile(fig_filename):
-                data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
-                report_lines.append(img_tag)
-                os.remove(fig_filename)
             
+            # This draws a box plot of sequence length distributions and puts a png in 
+            # the 'files' directory.
+            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', '%s/files'%output_directory, scale)
+            
+            
+            # Distribution of sequence lengths
+            #---------------------------------------------------------------------
+            title = 'Distribution of sequence lengths'
+            report_lines += ( '<h4>', title, '</h4>',  '')
+            
+            # This will write the img tag for the seq length boxplot in the report html
+            # The src attribute is the png file path. The commented lines are an alternative
+            # making an embeded figure.
+            if os.path.isfile(fig_filename):
+                #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
+                #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                img_tag = '<img height=400 src="%s">'%(fig_filename.partition('/')[-1])
+                report_lines.append(img_tag)
+                #os.remove(fig_filename)
+            
+            
+            # This will make GC content, nuc_degen_prop and prot_degen_prop png file,
+            # will put them in the /files subdirectory and will write the html sections
+            # for them, including img tags. All three params are feature qualifiers of
+            # SeqRecord objects found in pj.records, which is a list. 
             for stat in ('GC_content', 'nuc_degen_prop', 'prot_degen_prop'):
+                # This will make a dict with loci as keys and a list of stat values as
+                # dict values.
                 stat_dict = {}
                 ylabel = 'GC ontent (%)'
                 if not stat == 'GC_content':
-                    ylabel = 'Aambiguous positions (prop)'
+                    ylabel = 'Ambiguous positions (prop)'
                 for locus_name in pj.records_by_locus.keys():
                     stat_dict[locus_name] = []
                     for i in pj.records_by_locus[locus_name]:
@@ -2671,27 +2782,46 @@ def report_methods(pj, figs_folder):
                                 if feature.qualifiers['feature_id'][0] == i.id:
                                     if stat in feature.qualifiers.keys():
                                         stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
-                fig_filename = draw_boxplot(stat_dict, ylabel, figs_folder)
+                
+                # This will make the boxplot png and will put in in the /files subdirectory
+                fig_filename = draw_boxplot(stat_dict, ylabel, '%s/files'%output_directory, scale)
+                
+                # Distribution of stat
+                #---------------------------------------------------------------------
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
-                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                report_lines += ( '<h4>', title, '</h4>', '')
+                
+                # This will make the img tag using the png path as src. The commented lines are an alternative
+                # making an embeded image
                 if os.path.isfile(fig_filename):
-                    data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                    #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
+                    img_tag = '<img height=400 src="%s">'%(fig_filename.partition('/')[-1])
+                    #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
-                    os.remove(fig_filename)
-                    
+                    #os.remove(fig_filename)
+                
+        # Description of data concatenations
+        #------------------------------------------------------------------------
+        title = 'Description of data concatenations'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
+        
+        # filter out concatenation objects that were not used to build a concatenation
+        # by taking only concat names that are in the keys of pj.trimmed_alignments.
+        # pj.trimmed_alignments is a dict with alignment names as keys and list 
+        # lists containing an alignment object (biopython) and an alignment string as
+        # values.
         composed_concatenations = []
         for c in pj.concatenations:
             if c.name in pj.trimmed_alignments.keys():
                 composed_concatenations.append(c)
-        
-        
+
         for c in composed_concatenations:
             
             title = ('content of concatenation \"' + c.name + '\"').title()
-            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+            report_lines += ('<h4>', title, '</h4>', '')
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             
+            # This will write the concatenation attribute
             report_lines.append('Rules for  \"' + c.name + '\":')
             rule_1 = 'OTUs must have the loci: '
             for locus in c.concat_must_have_all_of:
@@ -2702,57 +2832,84 @@ def report_methods(pj, figs_folder):
                 rule_2 += str(group) +', '
             report_lines += (rule_2, '')
             
-            
+            # This are the otus and loci names in the concatenation. c.feature_id_dict
+            # is a dict with the otius as keys and dicts as values. Each of these dicts
+            # have the loci as keys and the feature id as value
             otus = c.feature_id_dict.keys()
             loci = [locus.name for locus in c.loci]
             
-            otus_max_length = max([len(i) for i in otus])+33
-            loci_columns_max_length = []
+            # This is the table's header
+            table_lines = [['','']+[locus.name for locus in c.loci]]
             
-            for locus in loci:
-                lengths = [len(locus)]
-                for otu in otus:
-                    if locus in c.feature_id_dict[otu].keys():
-                        lengths.append(len(c.feature_id_dict[otu][locus]))
-                    else:
-                        lengths.append(0)
-                loci_columns_max_length.append(max(lengths)+3)
+            
+            # Commented lines are an alternative way to write the table as 
+            # pre text
+            #otus_max_length = max([len(i) for i in otus])+33
+            #loci_columns_max_length = []
+            
+            #for locus in loci:
+            #    lengths = [len(locus)]
+            #    for otu in otus:
+            #        if locus in c.feature_id_dict[otu].keys():
+            #            lengths.append(len(c.feature_id_dict[otu][locus]))
+            #        else:
+            #           lengths.append(0)
+            #    loci_columns_max_length.append(max(lengths)+3)
                 
-            concat_header = ''.ljust(otus_max_length)
-            for i in range(len(loci)):
-                concat_header += loci[i].ljust(loci_columns_max_length[i])
-            report_lines += (concat_header, '~'*len(concat_header))
+            #concat_header = ''.ljust(otus_max_length)
+            #for i in range(len(loci)):
+            #    concat_header += loci[i].ljust(loci_columns_max_length[i])
+            #report_lines += (concat_header, '~'*len(concat_header))
                 
+            
+            # This will write the table
             for otu in otus:
+                
                 otu_species = ''
                 for locus in loci:
                     if locus in c.feature_id_dict[otu].keys():
                         feature_qualifiers = get_qualifiers_dictionary(pj, c.feature_id_dict[otu][locus])
                         if 'source_organism' in feature_qualifiers.keys():
                             otu_species = feature_qualifiers['source_organism']
-                    
-                concat_line = (otu+' '+otu_species).ljust(otus_max_length)
+                otu_line = [otu, otu_species]    
+                #concat_line = (otu+' '+otu_species).ljust(otus_max_length)
                 for i in range(len(loci)):
                     if loci[i] in c.feature_id_dict[otu].keys():
-                        concat_line += c.feature_id_dict[otu][loci[i]].ljust(loci_columns_max_length[i])
+                        #concat_line += c.feature_id_dict[otu][loci[i]].ljust(loci_columns_max_length[i])
+                        otu_line.append(c.feature_id_dict[otu][loci[i]])
                     else:
-                        concat_line += ''.ljust(loci_columns_max_length[i])
-                report_lines.append(concat_line)
-
-        report_lines += ['</pre>', '<h2>','Methods','</h2>', '<pre>', '']
+                        #concat_line += ''.ljust(loci_columns_max_length[i])
+                        otu_line.append('')
+                table_lines.append(otu_line)
+            
+                #report_lines.append(concat_line)
         
+            report_lines.append(HTML.table(table_lines[1:], header_row=table_lines[0]))  
+        
+        #############################  section 2:   METHODS  #######################
+        
+        # This section prints some attributes of each of the 'Conf' objects used.
+        # The 'Conf' objects are found in a list called pj.used_methods. 
+        # In an unpickled 'Project' object, the 'Conf' objects are replaced by lists of 
+        # strings describing the attributes because the objects themselves do not
+        # pickle well. The formating of the list representations when they are printed
+        # still needs some beautification. Also, I plan a 'revive_methods' func to turn
+        # them back to 'Conf' objects that can be rerun.
+        report_lines += ['', '<h2>','Methods','</h2>', '']
         
         for method in pj.used_methods:
+            # This will print list representations of the 'Conf' objects
             if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf' or method[0] == 'TrimalConf'):
                 title = method[0]
-                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                report_lines += ('', '<h4>', title, '</h4>','')
                 for i in method[1:]:
                     report_lines.append('<strong>'+str(i[0])+'</strong>')
                     report_lines.append(str(i[1]).replace(',','<br>'))
             
+            # These will print attributes in actual 'Conf' objects 
             elif isinstance(method, AlnConf):
                 title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                report_lines += ('', '<h4>', title, '</h4>', '')
                 #--------------------------------------------------------
                 align_line = 'Included loci :'
                 for locus in [locus.name for locus in method.loci]:
@@ -2772,7 +2929,7 @@ def report_methods(pj, figs_folder):
                     
             elif isinstance(method, RaxmlConf):
                 title = 'Raxml Tree Reconstruction Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                report_lines += ('', '<h4>', title, '</h4>', '')
                 #--------------------------------------------------------
                 tree_line = 'Included alignments :'
                 for aln in method.trimmed_alignments.keys():
@@ -2794,7 +2951,7 @@ def report_methods(pj, figs_folder):
                     
             elif isinstance(method, TrimalConf):
                 title = 'Trimal alignment trimming Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
+                report_lines += ('<h4>', title, '</h4>', '')
                 #--------------------------------------------------------
                 aln_line = 'Included alignments :'
                 for aln in method.alignments.keys():
@@ -2813,68 +2970,117 @@ def report_methods(pj, figs_folder):
                     report_lines.append('</pre>')
                     report_lines.append('')
                 
-        
-        
-        report_lines += ('</pre>', '','') 
-        
-        if len(pj.aln_summaries)>0:
-            title = 'Alignment summaries'
-            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
-            for summary in pj.aln_summaries:
-                report_lines += ['',summary,'']
                 
+        report_lines += ['',''] 
+        
+        #############################  section 3:   RESULTS  #######################
+        
+        report_lines += ['', '<h2>','Results','</h2>', '']
+        
+        # Global alignmnet statistics
+        #------------------------------------------------------------------------
+        title = 'Global alignmnet statistics'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
+        
+        
+        # This prints things like num of unique seqs and num of parsimony informative
+        # cloumns. Takes the info from 'pj.aln_summaries' which is a list of strings.
+        if len(pj.aln_summaries)>0:
+            for summary in pj.aln_summaries:
+                report_lines += ('<h4>', summary.splitlines()[0], '</h4>', '')
+                report_lines += ['',summary.partition('\n')[-1],'']
+        else:
+            report_lines += ['','No sequence alignments in this Project','']
+                
+        
+        # Per position alignmnet statistics
+        #------------------------------------------------------------------------
+        title = 'per position alignmnet statistics'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
         if len(pj.alignments.keys())>0:                    
             title = 'Alignment statistics before trimming'
-            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
-            report_lines += ['</pre>', '<h4>','Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=False)
+            report_lines += ('', '<h4>', title, '</h4>', '')
+            report_lines += ['<h4>','Trimal\'s Residue Similarity Score (-scc)','</h4>', '']
+            
+            # draw_trimal_scc(project, num_plots_in_raw, output_dir...
+            # 'trimmed' determines if it will analyse trimmed or raw alignments
+            # alignments are taken from pj.alignments or pj.trimmed_alignments which are dictionaries
+            # with alignment names as keys and lists containing an aln object and al string as values
+            
+            # scc on raw alignments
+            fig_file = draw_trimal_scc(pj, 2, '%s/files'%output_directory, trimmed=False)
             if os.path.isfile(fig_file):
-                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    #data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    #img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img src="%s">'%(fig_file.partition('/')[-1])
                     report_lines.append(img_tag)
-                    os.remove(fig_file)
-            report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=False, alg='-sgc')
+                    #os.remove(fig_file)
+            report_lines += [ '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '']
+            
+            # sgc on raw alignments
+            fig_file = draw_trimal_scc(pj, 2, '%s/files'%output_directory, trimmed=False, alg='-sgc')
             if os.path.isfile(fig_file):
-                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    #data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    #img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img src="%s">'%(fig_file.partition('/')[-1])
                     report_lines.append(img_tag)
-                    os.remove(fig_file)
-               
+                    #os.remove(fig_file)
+        else:
+            report_lines += ['No alignments in this project','']
+            
         if len(pj.trimmed_alignments.keys())>0:          
             title = 'Alignment statistics after trimming'
-            report_lines += ('</pre>', '<h3>', title, '</h3>', '<pre>', '')
-            report_lines += ['</pre>', '<h4>','"Trimal\'s Residue Similarity Score (-scc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=True)
-            if os.path.isfile(fig_file):
-                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
-                    report_lines.append(img_tag)
-                    os.remove(fig_file)
-            report_lines += ['</pre>', '<h4>','Trimal\'s column gap gcore (-sgc)','</h4>', '<pre>', '']
-            fig_file = draw_trimal_scc(pj, 2, figs_folder, trimmed=True, alg='-sgc')
-            if os.path.isfile(fig_file):
-                    data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
-                    report_lines.append(img_tag)
-                    os.remove(fig_file)
-        
-        if len(pj.trees.keys())>1:        
-            report_lines += ('','<h1>Robinson-Foulds distances </h1>','')
-            RF_filename, legend = calc_rf(pj, figs_folder)
-            scale = str(len(legend)*60)
-            if os.path.isfile(RF_filename):
-                    data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img height='+scale+' width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
-                    report_lines.append(img_tag)
-                    os.remove(RF_filename)
+            report_lines += ('', '<h4>', title, '</h4>', '')
+            report_lines += ['<h4>','"Trimal\'s Residue Similarity Score (-scc)','</h4>', '']
             
-            report_lines.append('<h3>Legend<h3><pre>')
-            report_lines += legend
-            report_lines.append('</pre>')
+            # scc on trimmed alignments
+            fig_file = draw_trimal_scc(pj, 2, '%s/files'%output_directory, trimmed=True)
+            if os.path.isfile(fig_file):
+                    #data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    #img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img src="%s">'%(fig_file.partition('/')[-1])
+                    report_lines.append(img_tag)
+                    #os.remove(fig_file)
+            report_lines += ['<h4>','Trimal\'s column gap gcore (-sgc)','</h4>',  '']
+            
+            # sgc on trimmed alignments
+            fig_file = draw_trimal_scc(pj, 2, '%s/files'%output_directory, trimmed=True, alg='-sgc')
+            if os.path.isfile(fig_file):
+                    #data_uri = open(fig_file, 'rb').read().encode('base64').replace('\n', '')
+                    #img_tag = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img src="%s">'%(fig_file.partition('/')[-1])
+                    report_lines.append(img_tag)
+                    #os.remove(fig_file)
+        else:
+            report_lines += ['No trimmed alignments in this project','']
         
-        report_lines += ('<h1>Trees</h1>','')
+        title = 'Robinson-Foulds distances'.title()
+        report_lines += ('<h3>', title, '</h3>', '')
         
+        if len(pj.trees.keys())>1:
+            try:
+                RF_filename, legend = calc_rf(pj, '%s/files'%output_directory)
+                scale = str(len(legend)*60)
+                if os.path.isfile(RF_filename):
+                        #data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
+                        #img_tag = '<img height='+scale+' width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                        img_tag = '<img src="%s">'%(RF_filename.partition('/')[-1])
+                        report_lines.append(img_tag)
+                        #os.remove(RF_filename)
+                
+                report_lines.append('<h3>Legend<h3><pre>')
+                report_lines += legend
+                report_lines.append('</pre>')
+            except:
+                report_lines += ['Found unrooted tree(s), skipping RF distance calculation']
+
+        else:
+            report_lines += ['Less than two trees in this Project','']
+
+                
+        #############################  section 4:   TREES  #######################
+        
+        report_lines += ['', '<h2>','Trees','</h2>', '']
         
         for tree in pj.trees.keys():
             report_lines += ('<h2>'+tree.split('@')[0]+'</h2>',
@@ -2890,16 +3096,29 @@ def report_methods(pj, figs_folder):
             
             
             if os.path.isfile(figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
-                data_handle = open(figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png','rb')
-                data_uri = data_handle.read().encode('base64').replace('\n', '')
-                data_handle.close()
-                img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
+                origin = figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'
+                dest = '%s/files/%s'%(output_directory, pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
+                shutil.copyfile(origin, dest)
+                #data_handle = open(figs_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png','rb')
+                #data_uri = data_handle.read().encode('base64').replace('\n', '')
+                #data_handle.close()
+                #img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
+                img_tag = '<img width=500 src="%s">'%(dest.partition('/')[-1])
                 report_lines.append(img_tag)
                 
         report_lines.append('</body>')
         report_lines.append('</html>')
-            
-        return report_lines
+        
+        lines = []
+        
+        for line in report_lines:
+            if '<' in line:
+                lines.append(line)
+            else:
+                lines.append(line.replace('\n','<br>')+'<br>')
+        
+        
+        return lines
     
         
 def pickle_pj(pj, pickle_file_name):
@@ -2984,15 +3203,16 @@ def publish(pj, folder_name, figures_folder):
     pj.write(folder+'/tree_and_alns.nexml','nexml')
     pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
-    for line in report_methods(pj, figures_folder):
+    for line in report_methods(pj, figures_folder, folder_name):
         report.write(line + '\n')
     report.close()
 
-    for tree in pj.trees.keys():
-        if os.path.isfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
-            from shutil import copyfile
-            copyfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png',
-                     folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
+    #'report_lines' is now taking care of puting the figures in the zip folder, within /files
+    #for tree in pj.trees.keys():
+    #    if os.path.isfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png'):
+    #        from shutil import copyfile
+    #        copyfile(figures_folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png',
+    #                 folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
             
          
     pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
