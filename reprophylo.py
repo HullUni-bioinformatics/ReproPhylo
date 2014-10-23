@@ -772,6 +772,15 @@ class Project:
         self.trimmed_alignments = {}
         self.trees = {}
         self.used_methods = []
+        self.sets = {}
+        self.defaults = {'raxmlHPC': 'raxmlHPC-PTHREADS-SSE3',
+                         'mafft': 'mafft',
+                         'muscle': 'muscle',
+                         'trimal': 'trimal',
+                         'pb': 'pb',
+                         'bpcomp': 'bpcomp',
+                         'tracecomp': 'tracecomp',
+                         'pal2nal': 'pal2nal.pl'}
         seen = []
         if isinstance(loci,list):
             for locus in loci:
@@ -1695,12 +1704,13 @@ class Project:
 
 
 
-    def align(self, alignment_methods=[], pal2nal='./pal2nal.pl'):
+    def align(self, alignment_methods=[], pal2nal='defaults'):
         
             """
             Configured by an AlnConf object
             """
-
+            if pal2nal == 'defaults':
+                pal2nal = self.defaults['pal2nal']
             seen_loci = []
             for method in alignment_methods:
                 method.timeit.append(time.time())
@@ -1796,8 +1806,11 @@ class Project:
 
 
 
-    def tree(self, raxml_methods):
+    def tree(self, raxml_methods, bpcomp='default'):
         # to do: determine the program used and the resulting expected tree file name
+        
+        if bpcomp == 'default':
+            bpcomp = self.defaults['bpcomp']
         
         for raxml_method in raxml_methods:
             raxml_method.timeit.append(time.time())
@@ -2189,6 +2202,11 @@ class AlnConf:
         self.timeit = [time.asctime()]
         self.platform = []
         self.cmd = cmd
+        if not program_name == 'mafft' and cmd == 'mafft':
+            self.cmd = pj.defaults[program_name]
+        elif program_name == 'mafft' and cmd != 'mafft' and not 'mafft' in cmd:
+            self.cmd = pj.defaults['mafft']
+            
         # make defalut input files
         if pj.records_by_locus == {}:
             pj.extract_by_locus()
@@ -2269,9 +2287,9 @@ class AlnConf:
                                                          open(input_filename2,'r').read()]
             cline = dict(dict(input=input_filename), **cline_args)
             if self.program_name == 'mafft':
-                self.command_lines[locus.name] = MafftCommandline(cmd=cmd)
+                self.command_lines[locus.name] = MafftCommandline(cmd=self.cmd)
             elif self.program_name == 'muscle':
-                self.command_lines[locus.name] = MuscleCommandline(cmd=cmd)
+                self.command_lines[locus.name] = MuscleCommandline(cmd=self.cmd)
             for c in cline.keys():
                 self.command_lines[locus.name].__setattr__(c,cline[c])
             print str(self.command_lines[locus.name])
@@ -2303,7 +2321,7 @@ class AlnConf:
 class TrimalConf:
 ##############################################################################################
     def __init__(self, pj, method_name='gappyout', program_name='trimal',
-                 cmd='trimal', alns='all', trimal_commands=dict(gappyout=True)):
+                 cmd='default', alns='all', trimal_commands=dict(gappyout=True)):
         
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
@@ -2318,6 +2336,8 @@ class TrimalConf:
         self.timeit = [time.asctime()]
         self.platform = []
         self.cmd = cmd
+        if cmd == 'default':
+            self.cmd = pj.defaults['trimal']
         irelevant = ['out', 'clustal', 'fasta', 'nbrf', 'nexus', 'mega',
                      'phylip3.2', 'phylip', 'sgt', 'scc', 'sct', 'sfc',
                      'sft','sident']
@@ -2464,21 +2484,18 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                            '-s': input_filename,
                            '-N': support_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
-                           '-m': model,
-                           '-T': tree_method.threads}
+                           '-m': model}
                       ],
                 'fD_fb':[{'-f': 'D',
                           '-p': random.randint(0,999),
                           '-s': input_filename,
                           '-N': ML_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
-                           '-m': model,
-                           '-T': tree_method.threads},{'-f': 'b',
+                           '-m': model},{'-f': 'b',
                                                        '-p': random.randint(0,999),
                                                        '-s': input_filename,
                                                        '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
                                                        '-m': model,
-                                                       '-T': tree_method.threads,
                                                        '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
                                                        '-z': 'RAxML_rellBootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'0'}
                          ],
@@ -2487,8 +2504,7 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                           '-s': input_filename,
                           '-N': ML_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
-                           '-m': model,
-                           '-T': tree_method.threads},{
+                           '-m': model},{
                                                        '-p': random.randint(0,999),
                                                        '-b': random.randint(0,999),
                                                        '-s': input_filename,
@@ -2501,12 +2517,23 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                                                        '-s': input_filename,
                                                        '-n': tree_method.id+'_'+trimmed_alignment_name+'2',
                                                        '-m': model,
-                                                       '-T': tree_method.threads,
                                                        '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
                                                        '-z': 'RAxML_bootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'1'}
                          ]
                 }
 
+    
+    if 'PTHREADS' in tree_method.cmd:
+        if tree_method.threads < 2:
+            tree_method.threads = 2
+            warnings.warn('raxmlHPC-PTHREADS requires at least 2 threads. Setting threads to 2')
+        for preset in presets:
+            for c in presets[preset]:
+                c['-T'] = tree_method.threads
+    else:
+        if tree_method.threads > 1:
+            raise RuntimeWarning('This is a serial raxmlHPC. Setting threads to 1.'+ 
+                                 'PTHREADS executables have to have explicit filename, eg, raxmlHPC-PTHREADS-SSE3')
     if partfile:
         for preset in presets.keys():
             for cline in range(len(presets[preset])):
@@ -2518,7 +2545,7 @@ class RaxmlConf:
     
     
     def __init__(self, pj, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
-                 cmd='raxmlHPC-PTHREADS-SSE3', preset = 'fa', alns='all', model='GAMMA', matrix='JTT', threads=4,
+                 cmd='default', preset = 'fa', alns='all', model='GAMMA', matrix='JTT', threads=4,
                  cline_args={}):
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
@@ -2539,12 +2566,14 @@ class RaxmlConf:
         self.timeit = [time.asctime()]
         self.platform = []
         self.cmd = cmd
+        if cmd == 'default':
+            self.cmd = pj.defaults['raxmlHPC']
         
         for trimmed_alignment in self.trimmed_alignments.keys():
             self.command_lines[trimmed_alignment] = []
             command_lines = write_raxml_clines(self, pj, trimmed_alignment)
             for command_line in command_lines:
-                cline_object = RaxmlCommandline(cmd=cmd)
+                cline_object = RaxmlCommandline(cmd=self.cmd)
                 for c in command_line.keys():
                     cline_object.__setattr__(c,command_line[c])
                 self.command_lines[trimmed_alignment].append(cline_object)
