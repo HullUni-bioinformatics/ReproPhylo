@@ -2750,19 +2750,19 @@ def report_methods(pj, figs_folder, output_directory):
         os.remove(outfile_name)
         
                 
-        # Sequence statistic plots
+        # Sequence statistics plots
         #------------------------------------------------------------------------
-        title = 'Sequence statistic plots'.title()
+        title = 'Sequence statistics plots'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         
         # This will plot 4 box plot figures representing the distribution of seq
         # length, GC content, %ambiguity in nuc and prot seqs for each locus.
         if len(pj.records_by_locus.keys())>0:
             
-            # This will determine the with of the figure, 0.5' per locus
+            # This will determine the width of the figure, 0.5' per locus
             scale = str(len(pj.records_by_locus.keys())*0.5)
             
-            # This will make a list of seq length for each locus. Seq length are calced
+            # This will make a list of seq length for each locus. Seq length are calculated
             # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
             # dict with loci names as keys, and lists of SeqReocrd objects as values
             lengths_dict = {}
@@ -2817,7 +2817,7 @@ def report_methods(pj, figs_folder, output_directory):
                 
                 # Distribution of stat
                 #---------------------------------------------------------------------
-                title = 'Distribution of sequence statistic \"'+stat+'\"'
+                title = 'Distribution of sequence statistics \"'+stat+'\"'
                 report_lines += ( '<h4>', title, '</h4>', '')
                 
                 # This will make the img tag using the png path as src. The commented lines are an alternative
@@ -2862,7 +2862,7 @@ def report_methods(pj, figs_folder, output_directory):
             report_lines += (rule_2, '')
             
             # This are the otus and loci names in the concatenation. c.feature_id_dict
-            # is a dict with the otius as keys and dicts as values. Each of these dicts
+            # is a dict with the otus as keys and dicts as values. Each of these dicts
             # have the loci as keys and the feature id as value
             otus = c.feature_id_dict.keys()
             loci = [locus.name for locus in c.loci]
@@ -2937,7 +2937,7 @@ def report_methods(pj, figs_folder, output_directory):
             
             # These will print attributes in actual 'Conf' objects 
             elif isinstance(method, AlnConf):
-                title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
+                title = 'Sequence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
                 report_lines += ('', '<h4>', title, '</h4>', '')
                 #--------------------------------------------------------
                 align_line = 'Included loci :'
