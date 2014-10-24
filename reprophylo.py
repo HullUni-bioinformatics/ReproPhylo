@@ -287,7 +287,7 @@ class Concatenation:
         for i in self.concat_must_have_all_of:
             must_have += i+','
         must_have = must_have[:-1]
-        trimmed_alignmnets_spec = ''
+        trimmed_alignments_spec = ''
         one_of = ''
         for i in self.concat_must_have_one_of:
             one_of += '[ '
@@ -296,12 +296,12 @@ class Concatenation:
             one_of += ']'
         if (self.define_trimmed_alns) > 0:
             for i in self.define_trimmed_alns:
-                trimmed_alignmnets_spec += i
+                trimmed_alignments_spec += i
         return ("Concatenation named %s, with loci %s,\n"
                 "of which %s must exist for all species\n"
                 "and at least one of each group of %s is represented.\n"
                 "Alignments with the following names: %s are prefered"
-                % (self.name, loci_string, must_have, one_of, trimmed_alignmnets_spec))
+                % (self.name, loci_string, must_have, one_of, trimmed_alignments_spec))
         
         
         
@@ -3006,7 +3006,7 @@ def report_methods(pj, figs_folder, output_directory):
         
         report_lines += ['', '<h2>','Results','</h2>', '']
         
-        # Global alignmnet statistics
+        # Global alignment statistics
         #------------------------------------------------------------------------
         title = 'Global alignment statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
@@ -3022,9 +3022,9 @@ def report_methods(pj, figs_folder, output_directory):
             report_lines += ['','No sequence alignments in this Project','']
                 
         
-        # Per position alignmnet statistics
+        # Per position alignment statistics
         #------------------------------------------------------------------------
-        title = 'per position alignmnet statistics'.title()
+        title = 'per position alignment statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         if len(pj.alignments.keys())>0:                    
             title = 'Alignment statistics before trimming'
