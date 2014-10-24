@@ -2698,7 +2698,7 @@ def report_methods(pj, figs_folder, output_directory):
         # Main report title, will print the time in which the 'Project' object
         # was initiated (not the time when the report was made as in previous 
         # versions.
-        head = 'reprophylo analysis from '+pj.starttime
+        head = 'ReproPhylo analysis from '+pj.starttime
         
 
         report_lines.append(head)
@@ -2719,12 +2719,12 @@ def report_methods(pj, figs_folder, output_directory):
         report_lines += ('<h3>', title, '</h3>', '')
         
         
-        # This will write a CSV file of the times each locus occures for each 
+        # This will write a CSV file of the times each locus occurs for each 
         # species. The species are sorted in alphabetical order. The CSV will 
-        # be writen to 'outfile_name'. After 'outfile_name' is processed it will
+        # be written to 'outfile_name'. After 'outfile_name' is processed it will
         # be deleted.The CSV will be read with the csv module and the resulting
         # list of lists will be made into a table using HTML and than added to 
-        # 'report_lines'. The species an gene counts are made by 'species_vs_loci'
+        # 'report_lines'. The species and gene counts are made by 'species_vs_loci'
         # based on the sequences record objects (biopython) found in pj.records.
         # pj.records is a list of SeqRecord objects
         outfile_name= str(random.randint(1000,2000))
