@@ -10,11 +10,11 @@ if False:
     A.Szitenberg@Hull.ac.uk
     Szitenberg@gmail.com
     
-    David H Lunt
-    D.H.Lunt@Hull.ac.uk
+    Dave Lunt
+    dave.lunt@gmail.com
     
     EvoHull.org
-    University of Hull
+    University of Hull, UK
     
     
     Developed with:
@@ -2656,7 +2656,7 @@ def report_methods(pj, figs_folder, output_directory):
         figs_folder -      The directory to which tree figures were saved. This is
                            specified in the annotate Project method
                            
-        output_directory - The directory to which this report will be written.It 
+        output_directory - The directory to which this report will be written. It 
                            can be inherited from the publish function which uses 
                            this function.
         """
@@ -2686,7 +2686,7 @@ def report_methods(pj, figs_folder, output_directory):
         
         # This will contain the text that points to the stylesheet file
         # I have named it rp.css. We need to add something that writes
-        # it here. Or that get it from the source directory and places it
+        # it here. Or that gets it from the source directory and places it
         # in /files
         
         css_line = '<link rel="stylesheet" type="text/css" href="files/rp.css">'
@@ -3008,7 +3008,7 @@ def report_methods(pj, figs_folder, output_directory):
         
         # Global alignmnet statistics
         #------------------------------------------------------------------------
-        title = 'Global alignmnet statistics'.title()
+        title = 'Global alignment statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         
         
