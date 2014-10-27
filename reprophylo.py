@@ -730,8 +730,54 @@ def aln_summary(aln_obj):
              ]
     return [lines, len(aln_obj), count_undetermined_lines(aln_obj), count_collapsed_aln_seqs(aln_obj)]        
             
-            
 
+def loci_list_from_csv(loci):
+    if any(len(line.split(',')) >= 4 for line in open(loci, 'r').readlines()):
+        pass
+    else:
+        raise IOError("File %s has no valid loci of format char_type,feature_type,name,aliases"%loci)
+        
+        
+    loci_dict = {}
+    loci_list = []
+    for line in [line.rstrip() for line in open(loci, 'r').readlines() if len(line.rstrip()) > 0]:
+        if len(line.split(',')) < 4:
+            raise IOError("The line %s in file %s is missing arguments. Needs at least char_type,feature_type,name,aliases"%
+                          (line.rstrip(), loci))
+        else:
+            group = None
+            try:
+                group = int(line.rstrip().split(',')[-1])
+            except:
+                pass
+            
+            if group:
+                locus_exists = False
+                for name in loci_dict:
+                    if 'group' in loci_dict[name].keys() and loci_dict[name]['group'] == group:
+                        loci_dict[name]['aliases'] += line.split(',')[3:-1]
+                        locus_exists = True
+                if not locus_exists:
+                    loci_dict[line.split(',')[2]] = {'group': int(line.rstrip().split(',')[-1]),
+                                                     'char_type': line.split(',')[0],
+                                                     'feature_type': line.split(',')[1],
+                                                     'aliases': line.split(',')[3:-1]
+                                                     }
+            else:
+                loci_dict[line.split(',')[2]] = {'group': None,
+                                                 'char_type': line.split(',')[0],
+                                                 'feature_type': line.split(',')[1],
+                                                 'aliases': line.split(',')[3:]
+                                                 }
+                
+            
+            
+    for name in loci_dict:
+        loci_list.append(Locus(loci_dict[name]['char_type'],
+                               loci_dict[name]['feature_type'],
+                               name,
+                               loci_dict[name]['aliases']))
+    return loci_list
 
 
 ##############################################################################################
@@ -792,52 +838,7 @@ class Project:
                 else:
                     seen.append(locus.name)
         elif isinstance(loci,str):
-            if any(len(line.split(',')) >= 4 for line in open(loci, 'r').readlines()):
-                pass
-            else:
-                raise IOError("File %s has no valid loci of format char_type,feature_type,name,aliases"%loci)
-                
-                
-            loci_dict = {}
-            loci_list = []
-            for line in [line.rstrip() for line in open(loci, 'r').readlines() if len(line.rstrip()) > 0]:
-                if len(line.split(',')) < 4:
-                    raise IOError("The line %s in file %s is missing arguments. Needs at least char_type,feature_type,name,aliases"%
-                                  (line.rstrip(), loci))
-                else:
-                    group = None
-                    try:
-                        group = int(line.rstrip().split(',')[-1])
-                    except:
-                        pass
-                    
-                    if group:
-                        locus_exists = False
-                        for name in loci_dict:
-                            if 'group' in loci_dict[name].keys() and loci_dict[name]['group'] == group:
-                                loci_dict[name]['aliases'] += line.split(',')[3:-1]
-                                locus_exists = True
-                        if not locus_exists:
-                            loci_dict[line.split(',')[2]] = {'group': int(line.rstrip().split(',')[-1]),
-                                                             'char_type': line.split(',')[0],
-                                                             'feature_type': line.split(',')[1],
-                                                             'aliases': line.split(',')[3:-1]
-                                                             }
-                    else:
-                        loci_dict[line.split(',')[2]] = {'group': None,
-                                                         'char_type': line.split(',')[0],
-                                                         'feature_type': line.split(',')[1],
-                                                         'aliases': line.split(',')[3:]
-                                                         }
-                        
-                    
-                    
-            for name in loci_dict:
-                loci_list.append(Locus(loci_dict[name]['char_type'],
-                                       loci_dict[name]['feature_type'],
-                                       name,
-                                       loci_dict[name]['aliases']))
-            self.loci = loci_list
+            self.loci = loci_list_from_csv(loci)
             print 'Read the following loci from file %s:'%loci
             for l in self.loci:
                 print str(l)
