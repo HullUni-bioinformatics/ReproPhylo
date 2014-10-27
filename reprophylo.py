@@ -10,11 +10,11 @@ if False:
     A.Szitenberg@Hull.ac.uk
     Szitenberg@gmail.com
     
-    David H Lunt
-    D.H.Lunt@Hull.ac.uk
+    Dave Lunt
+    dave.lunt@gmail.com
     
     EvoHull.org
-    University of Hull
+    University of Hull, UK
     
     
     Developed with:
@@ -287,7 +287,7 @@ class Concatenation:
         for i in self.concat_must_have_all_of:
             must_have += i+','
         must_have = must_have[:-1]
-        trimmed_alignmnets_spec = ''
+        trimmed_alignments_spec = ''
         one_of = ''
         for i in self.concat_must_have_one_of:
             one_of += '[ '
@@ -296,12 +296,12 @@ class Concatenation:
             one_of += ']'
         if (self.define_trimmed_alns) > 0:
             for i in self.define_trimmed_alns:
-                trimmed_alignmnets_spec += i
+                trimmed_alignments_spec += i
         return ("Concatenation named %s, with loci %s,\n"
                 "of which %s must exist for all species\n"
                 "and at least one of each group of %s is represented.\n"
                 "Alignments with the following names: %s are prefered"
-                % (self.name, loci_string, must_have, one_of, trimmed_alignmnets_spec))
+                % (self.name, loci_string, must_have, one_of, trimmed_alignments_spec))
         
         
         
@@ -2657,7 +2657,7 @@ def report_methods(pj, figs_folder, output_directory):
         figs_folder -      The directory to which tree figures were saved. This is
                            specified in the annotate Project method
                            
-        output_directory - The directory to which this report will be written.It 
+        output_directory - The directory to which this report will be written. It 
                            can be inherited from the publish function which uses 
                            this function.
         """
@@ -2687,7 +2687,7 @@ def report_methods(pj, figs_folder, output_directory):
         
         # This will contain the text that points to the stylesheet file
         # I have named it rp.css. We need to add something that writes
-        # it here. Or that get it from the source directory and places it
+        # it here. Or that gets it from the source directory and places it
         # in /files
         
         css_line = '<link rel="stylesheet" type="text/css" href="files/rp.css">'
@@ -2699,7 +2699,7 @@ def report_methods(pj, figs_folder, output_directory):
         # Main report title, will print the time in which the 'Project' object
         # was initiated (not the time when the report was made as in previous 
         # versions.
-        head = 'reprophylo analysis from '+pj.starttime
+        head = 'ReproPhylo analysis from '+pj.starttime
         
 
         report_lines.append(head)
@@ -2720,12 +2720,12 @@ def report_methods(pj, figs_folder, output_directory):
         report_lines += ('<h3>', title, '</h3>', '')
         
         
-        # This will write a CSV file of the times each locus occures for each 
+        # This will write a CSV file of the times each locus occurs for each 
         # species. The species are sorted in alphabetical order. The CSV will 
-        # be writen to 'outfile_name'. After 'outfile_name' is processed it will
+        # be written to 'outfile_name'. After 'outfile_name' is processed it will
         # be deleted.The CSV will be read with the csv module and the resulting
         # list of lists will be made into a table using HTML and than added to 
-        # 'report_lines'. The species an gene counts are made by 'species_vs_loci'
+        # 'report_lines'. The species and gene counts are made by 'species_vs_loci'
         # based on the sequences record objects (biopython) found in pj.records.
         # pj.records is a list of SeqRecord objects
         outfile_name= str(random.randint(1000,2000))
@@ -2751,19 +2751,19 @@ def report_methods(pj, figs_folder, output_directory):
         os.remove(outfile_name)
         
                 
-        # Sequence statistic plots
+        # Sequence statistics plots
         #------------------------------------------------------------------------
-        title = 'Sequence statistic plots'.title()
+        title = 'Sequence statistics plots'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         
         # This will plot 4 box plot figures representing the distribution of seq
         # length, GC content, %ambiguity in nuc and prot seqs for each locus.
         if len(pj.records_by_locus.keys())>0:
             
-            # This will determine the with of the figure, 0.5' per locus
+            # This will determine the width of the figure, 0.5' per locus
             scale = str(len(pj.records_by_locus.keys())*0.5)
             
-            # This will make a list of seq length for each locus. Seq length are calced
+            # This will make a list of seq length for each locus. Seq length are calculated
             # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
             # dict with loci names as keys, and lists of SeqReocrd objects as values
             lengths_dict = {}
@@ -2818,7 +2818,7 @@ def report_methods(pj, figs_folder, output_directory):
                 
                 # Distribution of stat
                 #---------------------------------------------------------------------
-                title = 'Distribution of sequence statistic \"'+stat+'\"'
+                title = 'Distribution of sequence statistics \"'+stat+'\"'
                 report_lines += ( '<h4>', title, '</h4>', '')
                 
                 # This will make the img tag using the png path as src. The commented lines are an alternative
@@ -2863,7 +2863,7 @@ def report_methods(pj, figs_folder, output_directory):
             report_lines += (rule_2, '')
             
             # This are the otus and loci names in the concatenation. c.feature_id_dict
-            # is a dict with the otius as keys and dicts as values. Each of these dicts
+            # is a dict with the otus as keys and dicts as values. Each of these dicts
             # have the loci as keys and the feature id as value
             otus = c.feature_id_dict.keys()
             loci = [locus.name for locus in c.loci]
@@ -2938,7 +2938,7 @@ def report_methods(pj, figs_folder, output_directory):
             
             # These will print attributes in actual 'Conf' objects 
             elif isinstance(method, AlnConf):
-                title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
+                title = 'Sequence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
                 report_lines += ('', '<h4>', title, '</h4>', '')
                 #--------------------------------------------------------
                 align_line = 'Included loci :'
@@ -3007,9 +3007,9 @@ def report_methods(pj, figs_folder, output_directory):
         
         report_lines += ['', '<h2>','Results','</h2>', '']
         
-        # Global alignmnet statistics
+        # Global alignment statistics
         #------------------------------------------------------------------------
-        title = 'Global alignmnet statistics'.title()
+        title = 'Global alignment statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         
         
@@ -3023,9 +3023,9 @@ def report_methods(pj, figs_folder, output_directory):
             report_lines += ['','No sequence alignments in this Project','']
                 
         
-        # Per position alignmnet statistics
+        # Per position alignment statistics
         #------------------------------------------------------------------------
-        title = 'per position alignmnet statistics'.title()
+        title = 'per position alignment statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         if len(pj.alignments.keys())>0:                    
             title = 'Alignment statistics before trimming'
