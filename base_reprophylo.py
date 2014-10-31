@@ -394,11 +394,14 @@ def extract_and_log_by_locus(pj):
                "Sequence length (max min mean)")
         for l in pj.loci:
             seq_lengths = [len(r) for r in pj.records_by_locus[l.name]] 
-            print(str(l.name).ljust(30,' ')+
-                   ("%i"%len(pj.records_by_locus[l.name])).ljust(10,' ')+
-                   ("%i"%max(seq_lengths)).ljust(9,' ')+
-                   ('%i'%min(seq_lengths)).ljust(9,' ')+
-                   '%.1f'%np.mean(seq_lengths))
+            if len(seq_lengths) > 0:
+                print(str(l.name).ljust(30,' ')+
+                       ("%i"%len(pj.records_by_locus[l.name])).ljust(10,' ')+
+                       ("%i"%max(seq_lengths)).ljust(9,' ')+
+                       ('%i'%min(seq_lengths)).ljust(9,' ')+
+                       '%.1f'%np.mean(seq_lengths))
+            else:
+                print (str(l.name).ljust(30,' ')+'No records')
         if cl.verbose_report:
             pj.publish(pj, cl.verbose_report, cl.figs)
                
@@ -545,6 +548,13 @@ def chekpoint_project(pj):
 #######################################################################
 #                       Execution
 #######################################################################
+cline = ''
+
+for i in sys.argv:
+    cline += i+' '
+print 'ReproPhylo was called with:'
+print cline
+print
 
 if cl.__:
     warnings.simplefilter('ignore')
