@@ -26,6 +26,7 @@ if False:
     cloud 2.8.5
     numpy 1.8.2
     matplotlib 1.3.1
+    pandas
     
     RAxML 8
     Phylobayes
@@ -95,7 +96,8 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
             # If it contains some attribute called 'gene' save that
             if 'gene' in feature.qualifiers:
                geneName = feature.qualifiers['gene'][0]
-               geneName.replace(',',';')
+               geneName.replace(',','_')
+               geneName.replace('/','_')
                if feature.type+','+geneName in gene_dict:
                    gene_dict[feature.type+','+geneName]+=1
                else:    
@@ -105,7 +107,8 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
             # Else if it contains some attribute called 'product' save that instead
             elif 'product' in feature.qualifiers:
                geneName = feature.qualifiers['product'][0]
-               geneName.replace(',',';')
+               geneName.replace(',','_')
+               geneName.replace('/','_')
                if feature.type+','+geneName in gene_dict:
                    gene_dict[feature.type+','+geneName]+=1
                else:    
@@ -114,9 +117,9 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
                
             # Otherwise, quit.
             else:
-               print 'ERROR when parsing feature: could not find either gene or product'
-               print feature.qualifiers
-               quit()
+               print 'ERROR when parsing feature: could not find either gene or product in '+record.id
+               #print feature.qualifiers
+               #quit()
    #print(gene_dict)
        
    #sorting happens via a list
@@ -146,7 +149,7 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
                else:
                    control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, alias]
            else:
-               name = alias.replace(' ','_')
+               name = alias.replace(' ','_').replace('/','_')
                control_file_lines[name] = [feature_type, alias]
                     
    control_file_handle = open(control_filename, 'wt')
@@ -420,12 +423,12 @@ def keep_feature(feature, loci):
         if feature.type == 'source':
             keep = 1
         elif feature.type == g.feature_type:
-            qaul = False
+            qual = None
             if 'gene' in feature.qualifiers.keys():
                 qual = 'gene'
             elif 'product' in feature.qualifiers.keys():
                 qual = 'product'
-            if not qual == False and feature.qualifiers[qual][0] in g.aliases:
+            if qual and feature.qualifiers[qual][0] in g.aliases:
                 keep = 1
     if keep == 1:
         return True
@@ -839,9 +842,9 @@ class Project:
                     seen.append(locus.name)
         elif isinstance(loci,str):
             self.loci = loci_list_from_csv(loci)
-            print 'Read the following loci from file %s:'%loci
-            for l in self.loci:
-                print str(l)
+            #print 'Read the following loci from file %s:'%loci
+            #for l in self.loci:
+                #print str(l)
         self.aln_summaries = []
                 
                 
@@ -1356,22 +1359,31 @@ class Project:
 
     def correct_metadata_from_file(self,csv_file):
         metadata = read_feature_quals_from_tab_csv(csv_file)
+        new_records = []
         for record in self.records:
-            record_corrected_metadata = metadata[record.id]
-            record.annotations['taxonomy'] = metadata[record.id]['taxonomy']
-            for feature in record.features:
-                if feature.type == 'source':
-                    feature.qualifiers = metadata[record.id]['source']
-                else:
-                    feature_id = feature.qualifiers['feature_id']
-                    translation = None
-                    if 'translation' in feature.qualifiers.keys():
-                        translation = feature.qualifiers['translation']
-                    feature.qualifiers = metadata[record.id]['features'][feature_id[0]]
-                    feature.qualifiers['feature_id'] = feature_id
-                    if translation:
-                        feature.qualifiers['translation'] = translation
-                
+            if record.id in metadata.keys():
+                #print 'making new record'
+                new_record = record
+                record_corrected_metadata = metadata[record.id]
+                new_record.annotations['taxonomy'] = metadata[record.id]['taxonomy']
+                for feature in new_record.features:
+                    if feature.type == 'source':
+                        feature.qualifiers = metadata[record.id]['source']
+                    else:
+                        feature_id = feature.qualifiers['feature_id']
+                        translation = None
+                        if 'translation' in feature.qualifiers.keys():
+                            translation = feature.qualifiers['translation']
+                        feature.qualifiers = metadata[record.id]['features'][feature_id[0]]
+                        feature.qualifiers['feature_id'] = feature_id
+                        if translation:
+                            feature.qualifiers['translation'] = translation
+                new_records.append(new_record)
+            else:
+                #print 'using old records'
+                new_records.append(record)
+        
+        self.records = new_records
                 
     def if_this_then_that(self, IF_THIS, IN_THIS, THEN_THAT, IN_THAT, mode = 'whole'):
         
@@ -1772,7 +1784,7 @@ class Project:
                         aln_filename = method.id+'_'+locus.name+'.aln'
                         AlignIO.write(align, aln_filename, 'fasta')
                         cds_filename = method.id+'_CDS_in_frame_'+locus.name+'.fasta'
-                        stdout = os.popen('perl '+pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr').read()
+                        stdout = os.popen(pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr').read()
                         align = AlignIO.read(StringIO(stdout), "clustal",  alphabet=IUPAC.ambiguous_dna)
                         #from Bio import CodonAlign
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
@@ -1807,20 +1819,26 @@ class Project:
 
 
     def write_alns(self, format = 'fasta'):
+        filenames = []
         if len(self.alignments.keys()) == 0:
             raise IOError('Align the records first')
         else:
             for key in self.alignments:
                 AlignIO.write(self.alignments[key], key+'_aln.'+format, format)
+                filenames.append(key+'_aln.'+format)
+        return filenames
 
 
 
     def write_trimmed_alns(self, format = 'fasta'):
+        filenames = []
         if len(self.trimmed_alignments.keys()) == 0:
             raise IOError('Align and trimmed the records first')
         else:
             for key in self.trimmed_alignments.keys():
                 AlignIO.write(self.trimmed_alignments[key], key+'_trimmed_aln.'+format, format)
+                filenames.append(key+'_trimmed_aln.'+format)
+        return filenames
 
 
 
@@ -2178,6 +2196,43 @@ class Project:
             m.timeit.append(m.timeit[2]-m.timeit[1])
             self.used_methods.append(m)
 
+
+    def report_seq_stats(self):        
+        if len(self.records_by_locus.keys())>0:
+
+            # This will make a list of seq length for each locus. Seq length are calced
+            # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
+            # dict with loci names as keys, and lists of SeqReocrd objects as values
+            lengths_dict = {}
+            for locus_name in self.records_by_locus.keys():
+                lengths_dict[locus_name] = []
+                for record in self.records_by_locus[locus_name]:
+                    lengths_dict[locus_name].append(len(record.seq))
+                    
+            print "Distribution of sequence lengths".title()
+            draw_boxplot(lengths_dict, 'Seq length (bp)', 'inline')
+            
+            
+            for stat in ('GC_content', 'nuc_degen_prop', 'prot_degen_prop'):
+                title = 'Distribution of sequence statistic \"'+stat+'\"'
+                print title.title()
+                # This will make a dict with loci as keys and a list of stat values as
+                # dict values.
+                stat_dict = {}
+                ylabel = 'GC ontent (%)'
+                if not stat == 'GC_content':
+                    ylabel = 'Ambiguous positions (prop)'
+                for locus_name in self.records_by_locus.keys():
+                    stat_dict[locus_name] = []
+                    for i in self.records_by_locus[locus_name]:
+                        for record in self.records:
+                            for feature in record.features:
+                                if feature.qualifiers['feature_id'][0] == i.id:
+                                    if stat in feature.qualifiers.keys():
+                                        stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
+                
+                draw_boxplot(stat_dict, ylabel, 'inline')
+                
 ##############################################################################################
 class AlnConf:
 ##############################################################################################
@@ -2192,9 +2247,9 @@ class AlnConf:
     #                                     cline_args=dict())
     """
     
-    def __init__(self, pj, method_name='MafftLinsi', CDSAlign=True, program_name='mafft',
+    def __init__(self, pj, method_name='mafftDefault', CDSAlign=True, program_name='mafft',
                  cmd='mafft', loci='all',
-                 cline_args=dict(localpair=True, maxiterate=1000)):
+                 cline_args=dict()):
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.CDSAlign=CDSAlign
@@ -2255,6 +2310,9 @@ class AlnConf:
                             elif len(S)%3 == 2:
                                 S = S[:-2]  
                             # make protein input file seq
+                            if not 'translation' in feature.qualifiers.keys():
+                                raise IOError("Feature %s has not 'translation' qualifier"%
+                                              feature.qualifiers['feature_id'][0])
                             P = Seq(feature.qualifiers['translation'][0], IUPAC.protein)
                             # Remove 3' positions that are based on partial codons
                             while len(P)*3 > len(S):
@@ -2602,20 +2660,24 @@ class RaxmlConf:
 from pylab import *
 import random
 
-def draw_boxplot(dictionary, y_axis_label, figs_folder, scale): #'locus':[values]
+def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     import numpy as np
     import matplotlib.pyplot as plt
     items = dictionary.items()
     items.sort()
     
     data = [locus[1] for locus in items]
+    boxwidth = 0.4
+    if len(data) > 15:
+        boxwidth = 0.2
+    elif len(data) > 30:
+        boxwidth = 0.1
         
     fig, ax1 = plt.subplots()
-    fig.figsize = (scale, 3)
     #plt.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
 
     #bp = plt.boxplot(data, widths=0.75, patch_artist=True)
-    bp = plt.boxplot(data, patch_artist=True)
+    bp = plt.boxplot(data, widths=boxwidth, patch_artist=True)
     
     for box in bp['boxes']:
     # change outline color
@@ -2658,8 +2720,11 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder, scale): #'locus':[values
     ax1.set_ylabel(y_axis_label, size=18)
     
     name = str(random.randint(1000,2000))
-    fig.savefig(figs_folder + '/' + name +'.png')
-    close('all')
+    if figs_folder=='inline':
+        fig.show()
+    else:
+        fig.savefig(figs_folder + '/' + name +'.png')
+        close('all')
     return figs_folder + '/' + name+'.png'
     
 #################################################################################
@@ -2691,10 +2756,10 @@ def report_methods(pj, figs_folder, output_directory):
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe, 2)
         callername = calframe[1][3]
-
+        print "reporter was called by "+str(callername)
         # Here we manage mkdir and error raising for preexisting 
         # output_directory, based of the caller function
-        if os.path.isdir(output_directory) and callername != 'publish':
+        if os.path.isdir(output_directory) and str(callername) != 'publish':
             raise RuntimeError('%s already exists'%output_directory) 
         else:
             # This will make output_directory if it doesnt exist and
@@ -2730,7 +2795,7 @@ def report_methods(pj, figs_folder, output_directory):
         #############################  section 1:   DATA  #######################
         report_lines += ['<h2>','Data','</h2>', '']
         
-        
+        print "now printing species table"
         # Species over loci table
         #------------------------------------------------------------------------
         title = 'species representation in sequence data'.title()
@@ -2767,7 +2832,7 @@ def report_methods(pj, figs_folder, output_directory):
         
         os.remove(outfile_name)
         
-                
+        print "now making sequence statistics plots"        
         # Sequence statistic plots
         #------------------------------------------------------------------------
         title = 'Sequence statistic plots'.title()
@@ -2791,7 +2856,7 @@ def report_methods(pj, figs_folder, output_directory):
             
             # This draws a box plot of sequence length distributions and puts a png in 
             # the 'files' directory.
-            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', '%s/files'%output_directory, scale)
+            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', '%s/files'%output_directory)
             
             
             # Distribution of sequence lengths
@@ -2831,7 +2896,7 @@ def report_methods(pj, figs_folder, output_directory):
                                         stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
                 
                 # This will make the boxplot png and will put in in the /files subdirectory
-                fig_filename = draw_boxplot(stat_dict, ylabel, '%s/files'%output_directory, scale)
+                fig_filename = draw_boxplot(stat_dict, ylabel, '%s/files'%output_directory)
                 
                 # Distribution of stat
                 #---------------------------------------------------------------------
@@ -2847,6 +2912,7 @@ def report_methods(pj, figs_folder, output_directory):
                     report_lines.append(img_tag)
                     #os.remove(fig_filename)
                 
+        print "now reporting concatenations"
         # Description of data concatenations
         #------------------------------------------------------------------------
         title = 'Description of data concatenations'.title()
@@ -2944,6 +3010,7 @@ def report_methods(pj, figs_folder, output_directory):
         # them back to 'Conf' objects that can be rerun.
         report_lines += ['', '<h2>','Methods','</h2>', '']
         
+        print "now reporting methods"
         for method in pj.used_methods:
             # This will print list representations of the 'Conf' objects
             if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf' or method[0] == 'TrimalConf'):
@@ -3023,7 +3090,7 @@ def report_methods(pj, figs_folder, output_directory):
         #############################  section 3:   RESULTS  #######################
         
         report_lines += ['', '<h2>','Results','</h2>', '']
-        
+        print "now reporting alignment statistics"
         # Global alignmnet statistics
         #------------------------------------------------------------------------
         title = 'Global alignmnet statistics'.title()
@@ -3101,6 +3168,7 @@ def report_methods(pj, figs_folder, output_directory):
         else:
             report_lines += ['No trimmed alignments in this project','']
         
+        print "making RF matrix"
         title = 'Robinson-Foulds distances'.title()
         report_lines += ('<h3>', title, '</h3>', '')
         
@@ -3126,7 +3194,7 @@ def report_methods(pj, figs_folder, output_directory):
 
                 
         #############################  section 4:   TREES  #######################
-        
+        print "reporting trees"
         report_lines += ['', '<h2>','Trees','</h2>', '']
         
         for tree in pj.trees.keys():
@@ -3152,6 +3220,7 @@ def report_methods(pj, figs_folder, output_directory):
                 #img_tag = '<img width=500 src="data:image/png;base64,{0}">'.format(data_uri)
                 img_tag = '<img width=500 src="%s">'%(dest.partition('/')[-1])
                 report_lines.append(img_tag)
+
                 
         report_lines.append('</body>')
         report_lines.append('</html>')
@@ -3189,7 +3258,8 @@ def unpickle_pj(pickle_file_name):
         pickle_handle = open(pickle_file_name, 'rb')
         pkl_pj = pickle.pickle.load(pickle_handle)
         new_pj = Project(pkl_pj.loci)
-        attr_names = ['alignments',
+        attr_names = ['aln_summaries',
+                      'alignments',
                       'concatenations',
                       'records',
                       'records_by_locus',
@@ -3243,6 +3313,7 @@ def publish(pj, folder_name, figures_folder):
     else:
         folder = folder_name
         zip_file = folder_name + '.zip'
+    print "checking if file exists"
     if os.path.exists(folder) or os.path.exists(zip_file):
         raise IOError(folder_name + ' already exists')
     
@@ -3250,7 +3321,8 @@ def publish(pj, folder_name, figures_folder):
     pj.write(folder+'/tree_and_alns.nexml','nexml')
     pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
-    for line in report_methods(pj, figures_folder, folder_name):
+    lines = report_methods(pj, figures_folder, folder_name)
+    for line in lines:
         report.write(line + '\n')
     report.close()
 
@@ -3262,12 +3334,13 @@ def publish(pj, folder_name, figures_folder):
     #                 folder+'/'+pj.trees[tree][0].get_leaves()[0].tree_method_id+'.png')
             
          
+    print "pickling"
     pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
     pickle_pj(pj, folder + '/' + pickle_name)
 
     
     import zipfile, shutil
-    
+    print "archiving"
     zf = zipfile.ZipFile(zip_file, "w")
     for dirname, subdirs, files in os.walk(folder):
         zf.write(dirname)
@@ -3275,6 +3348,7 @@ def publish(pj, folder_name, figures_folder):
             zf.write(os.path.join(dirname, filename))
     zf.close()
     shutil.rmtree(folder)
+    print "report ready"
     
 def calc_rf(pj, figs_folder):
     meta = 'feature_id'
@@ -3399,6 +3473,21 @@ def draw_trimal_scc(pj, num_col, figs_folder, trimmed=False, alg = '-scc'):
     fig.savefig(figs_folder + '/' + figname +'.png')
     plt.close('all')
     return figs_folder + '/' + figname+'.png'
+
+def view_csv_as_table(csv_filename, delimiter, quotechar='|'):
+    with open(csv_filename, 'rb') as csvfile:
+        sp_vs_lc = list(csv.reader(csvfile, delimiter=delimiter, quotechar=quotechar))
+        field_sizes = []
+        for i in range(len(sp_vs_lc[0])):
+            lengths = []
+            for row in sp_vs_lc:
+                lengths.append(len(row[i]))
+            field_sizes.append(max(lengths))
+        for row in sp_vs_lc:
+            string = ''
+            for i in range(len(row)):
+                string += row[i].ljust(field_sizes[i]+3)
+            print string
 
 if __name__ == "__main__":
     import doctest
