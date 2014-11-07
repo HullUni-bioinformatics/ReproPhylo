@@ -1,0 +1,144 @@
+
+<tool id="Start a Project" name="Start a Project"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py
+        #if str($howinit.inputs)=="gb"
+        $projout -_ -g $genbank -w $lociout -y $metaout
+        #else if str($howinit.inputs)=="loci"
+        $projout -_ -r $loci_csv_in
+        #else if str($howinit.inputs)=="locus"
+        $projout -_ -u $howinit.chartype $howinit.featuretype $howinit.name
+        #else if str($howinit.inputs)=="both"
+        $projout -_ -r $loci_csv_in  -g $genbanki -y $metaout
+        #end if
+        > $log
+    </command>
+    <inputs>
+        <conditional name="howinit">
+           <param name="inputs" type="select" label="Initiate the Project with">
+                <option value="gb">a GenBank file</option>
+                <option value="loci">a loci CSV file</option> 
+                <option value="locus">feed in a locus</option> 
+                <option value="both">GenBank and loci CSV files</option> 
+           </param>
+           <when value="gb">
+                <param name="genbank" type="data" label="genbank or embl file"/>
+           </when>
+           <when value="loci">
+                <param name="loci_csv_in" type="data" label="Input loci CSV file"/>
+           </when>
+           <when value="locus">
+                <param name="chartype" type="select" label="DNA or Protein">
+                    <option value="dna">DNA</option>
+                    <option value="prot">Protein</option>
+                </param>
+                <param name="featuretype" type="text" label="Feature type (eg, CDS, rRNA, Protein ...)"/>
+                <param name="name" type="text" label="Gene name (eg cox1. To control aliases use a CSV)"/>
+           </when>
+           <when value="both">
+                <param name="loci_csv_in" type="data" label="Input loci CSV file"/>
+                <param name="genbanki" type="data" label="genbank or embl file"/>
+           </when>
+        </conditional>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="projout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+        <data name="lociout" format='txt' label="${tool.name} on ${on_string}: Loci CSV" >
+            <filter>(howinit["inputs"]=="gb") </filter>
+        </data>
+        <data name="metaout" format='csv' label="${tool.name} on ${on_string}: Metadata CSV" >
+            <filter>((howinit["inputs"]=="gb") or (howinit["inputs"]=="both"))</filter>
+        </data>
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Start a Project"
+------------------
+
+This tool starts a ReproPhylo Project. For the very least, a project requires that the analysed loci are specified.
+Loci can be specified in three ways:  
+
+*A genbank or embl file*
+
+Genbank files contain information about the gene or product identity of the 
+entries they contain. If ReproPhylo is started only with such a file, all
+the loci in the file will be used to initiate ReproPhylo. A loci CSV file (see below)
+will be printed. It can be edited and used to re-start a Project.
+                   
+
+*A loci CSV file*
+
+A loci CSV file lists the loci to be analysed. It consists of one line
+for each locus. The lines have the following form:
+char_type,feature_type,gene_name,alias1,alias2,...,aliasn
+
+**char_type** can be dna or prot
+
+**feature_type** could be CDS, rRNA, Protein, tRNA etc.
+
+**gene_name** is any name you want to call you locus.
+
+**aliases** are any name the locus is given in genbank under the 'gene' or 'product' qualifiers.
+
+If you first ran the tool using the 'genbank or embl file' option, you will get a loci CSV file 
+containing all the loci in the genbank file, as output. If a certain gene apears in more than one
+name in the genbenk file, the loci CSV file is likely to account for this bay adding additional
+names as aliases of the first name. However, you may find that some loci have not been collapsed
+and apear in more than one line. In this case, you may add a coma and a shared integer at the
+end of lines you wish to synonymize. You may also edit the first value to switch between DNA and
+protein sequences.
+
+Example:
+
+
+The output loci CSV may be:
+
+
+``dna,rRNA,18S,18s,SSU,rRNA`` 
+
+``dna,CDS,cox1,cox1``
+
+``dna,CDS,COI,COI``
+
+
+This file can be edited as follows:
+
+            
+``dna,rRNA,18S,18s,SSU,rRNA``
+
+``prot,CDS,cox1,cox1,1``
+
+``dna,CDS,COI,COI,1``
+            
+
+It will read by ReproPhylo as follows:
+
+            
+``dna,rRNA,18S,18s,SSU,rRNA`` 
+
+``prot,CDS,cox1,cox1,COI``
+                            
+                           
+*Feed in a locus*
+
+If you intend to read a single fasta file with a single locus, you can feed 
+the locus manually. You will need to specify a char_type (dna or prot), a feature
+type (CDS, Protein, rRNA etc...) and a gene name.
+ 
+    
+*GenBank and loci CSV files*
+
+
+Provide both a loci CSV and a genbank file. The Project will include 
+the loci in the CSV file and all the genbank records that fit those loci.
+
+
+</help>
+</tool>    

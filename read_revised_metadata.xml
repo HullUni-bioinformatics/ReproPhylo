@@ -1,0 +1,37 @@
+
+<tool id="Read Revised Metadata" name="Read Revised Metadata"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py
+        $projin -_ -a $altprojout -z $metain 
+        > $log
+    </command>
+    <inputs>
+        <param name="projin" type="data" label="Input Project file" />
+        <param name="metain" type="data" label="Input metadata CSV"/>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Read Revised Metadata"
+-----------------------
+When you read data with `Read Data`, a CSV file containing the metadata of all the sequence features is printed.
+This is a tab delimited text file. It contains a line for each feature. For example, a single genbank entry that 
+contains ten genes will produce 10 lines in the metadata CSV. In this example, each line starts with the 
+source feature qualifiers. Since there is only one source feature in each genbank record, the first few (source)
+columns will be identical accross the ten lines. Then there's a taxonomy column and finaly columns representing
+each of the ten features' metadata. In order to extend or correct the metadata, you can manually edit this file in
+excell and read it back using this tool. You can modify existing columns or add new ones. This file should contain
+any data relevant to your experiment, eg, morphological, geographic or ecological data. This way it will from now
+on be associated with the tree's leaves and you will be able to use it for tree annotations and graphics.
+
+</help>
+</tool>    

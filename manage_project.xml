@@ -1,0 +1,264 @@
+
+<tool id="Manage a Project" name="Manage a Project"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py
+        #if str($theProjectIsNew.isnew)=="yes" and str($theProjectIsNew.howinit.inputs)=="gb"
+        $projout -_ -g $genbank -w $lociout -y $metaout
+        #else if str($theProjectIsNew.isnew)=="yes" and str($theProjectIsNew.howinit.inputs)=="loci"
+        $projout -_ -r $loci_csv_in
+        #else if str($theProjectIsNew.isnew)=="yes" and str($theProjectIsNew.howinit.inputs)=="locus"
+        $projout -_ -u $theProjectIsNew.howinit.chartype $theProjectIsNew.howinit.featuretype $theProjectIsNew.howinit.name
+        #else if str($theProjectIsNew.isnew)=="yes" and str($theProjectIsNew.howinit.inputs)=="both"
+        $projout -_ -r $loci_csv_in  -g $genbanki -y $metaout
+        #else if str($theProjectIsNew.isnew)=="no" 
+        $projin -_ -a $altprojout
+        #end if
+        #if (str($theProjectIsNew.isnew)=="no") and (str($theProjectIsNew.moreOptions.action)=="writemeta")
+        -y $metaout 
+        #end if
+        #if (str($theProjectIsNew.isnew)=="no") and (str($theProjectIsNew.moreOptions.action)=="writeloci")
+        -w $lociout 
+        #end if
+        #if (str($theProjectIsNew.isnew)=="no") and (str($theProjectIsNew.moreOptions.action)=="readmeta")
+        -z $theProjectIsNew.moreOptions.metain 
+        #end if
+        #if (str($theProjectIsNew.isnew)=="no") and (str($theProjectIsNew.moreOptions.action)=="report")
+        -v report_arcive -j $theProjectIsNew.moreOptions.figsdir  --noninteractive 
+        #end if
+        #if (str($theProjectIsNew.isnew)=="no") and (str($theProjectIsNew.moreOptions.action)=="dump")
+        -m $theProjectIsNew.moreOptions.format -p gbout 
+        #end if
+        #if str($readData.newData)=="gb"
+        -g $genbankii $readData.replacedata -y $metaout
+        #else if str($readData.newData)=="fasta"
+        -f $fastafile -t $readData.fastaCharType -n $readData.GenName $readData.FeatureType $readData.replacedata -y $metaout
+        #else if str($readData.newData)=="both"
+        -g $genbankii -f $readData.fastafile -t $readData.fastaCharType -n $readData.GenName $readData.FeatureType $readData.replacedata -y $metaout
+        #end if
+        #if str($readLoci.newLoci)=="csv"
+         -r $readLoci.loci_csv_in $readLoci.replaceloci
+        #else if str($readLoci.newLoci)=="cline"
+        -u $readLoci.CharType $readLoci.FeatureType $readLoci.GenName $readLoci.replaceloci
+        #end if 
+        #if str($runAnalysis.execute)=="yes"
+        $runAnalysis.overwrite -s  --threads $runAnalysis.threads --noninteractive -j $runAnalysis.figs
+        #end if
+        > $log
+    </command>
+    <inputs>
+        <conditional name="theProjectIsNew">
+            <param name="isnew" type="select" label="This is a new project">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </param>
+            <when value="yes">
+                <conditional name="howinit">
+                   <param name="inputs" type="select" label="Initiate the Project with">
+                        <option value="gb">a GenBank file</option>
+                        <option value="loci">a loci CSV file</option> 
+                        <option value="locus">feed in a locus</option> 
+                        <option value="both">GenBank and loci CSV files</option> 
+                   </param>
+                   <when value="gb">
+                        <param name="genbank" type="data" label="genbank or embl file"/>
+                   </when>
+                   <when value="loci">
+                        <param name="loci_csv_in" type="data" label="Input loci CSV file"/>
+                   </when>
+                   <when value="locus">
+                        <param name="chartype" type="select" label="DNA or Protein">
+                            <option value="dna">DNA</option>
+                            <option value="prot">Protein</option>
+                        </param>
+                        <param name="featuretype" type="text" label="Feature type (eg, CDS, rRNA, Protein ...)"/>
+                        <param name="name" type="text" label="Gene name (eg cox1. To control aliases use a CSV)"/>
+                   </when>
+                   <when value="both">
+                        <param name="loci_csv_in" type="data" label="Input loci CSV file"/>
+                        <param name="genbanki" type="data" label="genbank or embl file"/>
+                   </when>
+                </conditional>
+            </when>
+            <when value="no">
+                <param name="projin" type="data" label="Input Project file" />
+                <conditional name="moreOptions">
+                    <param name="action" type="select" label="Misc Utils">
+                        <option value="none">None</option>
+                        <option value="writemeta">Write a metadta CSV file</option>
+                        <option value="writeloci">Write a loci CSV (not when reading)</option>
+                        <option value="readmeta">Read a metadata CSV</option>
+                        <option value="report">Dump a full report to zip file</option>
+                        <option value="dump">Dump sequence alignments and reocrds</option>
+                    </param>
+                    <when value="none"/>
+                    <when value="writemeta"/>
+                    <whne value="writeloci"/>
+                    <when value="readmeta">
+                        <param name="metain" type="data" label="Input metadata CSV"/>
+                    </when>
+                    <when value="report">
+                        <param name="figsdir" type="text" label="Local path to figures"/>
+                    </when>
+                    <when value="dump">
+                        <param name="format" type="select" label="Choose alignement format" >
+                            <option value="fasta">Fasta</option>
+                            <option value="phylip-relaxed">Phylip</option>
+                            <option value="nexus">Nexus</option>
+                            <option value="stockholm">Stockholm</option>
+                            <option value="clustal">Clustal</option>
+                        </param>
+                    </when>
+                </conditional>
+            </when>
+        </conditional>
+        <conditional name="readData">
+            <param name="newData" type="select" label="Read new data?">
+                <option value="no">No</option>
+                <option value="gb">Read a genbank file</option>
+                <option value="fasta">Read a fasta file</option>
+                <option value="both">Read a fasta and a genbank file</option>
+            </param>
+            <when value="no"/>
+            <when value="gb">
+                <param name="genbankii" type="data" label="Input genbank or embl file"/>
+                <param name="replacedata" type="boolean" truevalue="-e" falsevalue="" label="Replace data with new one?"/>
+            </when>
+            <when value="fasta">
+                <param name="fastafile" type="data" label="Input fasta file"/>
+                <param name="fastaCharType" type="select" label="DNA or Protein sequences?">
+                    <option value='dna'>DNA</option>
+                    <option value='prot'>Protein</option>
+                </param>
+                <param name='GenName' type="text" label="The gene name of the fasta sequences (eg cox1)"/>
+                <param name='FeatureType' type="text" lable="The fasta sequence feature type (eg CDS, rRNA...)"/>
+                <param name="replacedata" type="boolean" truevalue="-e" falsevalue="" label="Replace data with new one?"/>
+            </when>
+            <when value="both">
+                <param name="genbankii" type="data" label="Input genbank or embl file"/>
+                <param name="fastafile" type="data" lable="Input fasta file"/>
+                <param name="fastaCharType" type="select" label="DNA or Protein sequences?">
+                    <option value='dna'>DNA</option>
+                    <option value='prot'>Protein</option>
+                </param>
+                <param name='GenName' type="text" label="The gene name of the fasta sequences (eg cox1)"/>
+                <param name='FeatureType' type="text" lable="The fasta sequence feature type (eg CDS, rRNA...)"/>
+                <param name="replacedata" type="boolean" truevalue=" -e " falsevalue=" " label="Replace data with new one?"/>
+            </when>
+        </conditional>
+        <conditional name="readLoci">
+            <param name="newLoci" type="select" label="Read new loci?">
+                <option value="no">No</option>
+                <option value="csv">from a loci CSV</option>
+                <option value="cline">feed a locus manually</option>
+            </param>
+            <when value="no"/>
+            <when value="csv">
+                <param name="loci_csv_in" type="data" label="Input loci CSV file"/>
+                <param name="replaceloci" type="boolean" truevalue="-b" falsevalue="" label="Replace loci with new ones?"/>
+            </when>
+            <when value="cline">
+                <param name="CharType" type="select" label="DNA or Protein locus?">
+                    <option value='dna'>DNA</option>
+                    <option value='prot'>Protein</option>
+                </param>
+                <param name='FeatureType' type="text" lable="The feature type (eg CDS, rRNA...)"/>
+                <param name='GenName' type="text" label="The gene name (eg cox1)"/>
+                <param name="replaceloci" type="boolean" truevalue="-b" falsevalue="" label="Replace loci with new ones?"/>
+            </when>
+        </conditional>
+        <conditional name="runAnalysis">
+            <param name="execute" type="select" label="Run exploratory analysis" >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+            </param>
+            <when value="no"/>
+            <when value="yes">
+                <param name="threads" type="text" value="4" label="How many threads?"/>
+                <param name="overwrite" type="boolean" truevalue="-x" falsevalue="" label="Overwrite Project's analyses?"/>
+                <param name="figs" type="text" labe="A local directory to write the figures to"/>
+            </when>
+        </conditional>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="projout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" >
+            <filter>(theProjectIsNew["isnew"]=="yes")</filter>
+        </data>
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" >
+            <filter>(theProjectIsNew["isnew"]=="no")</filter>
+        </data>
+        <data name="lociout" format='txt' label="${tool.name} on ${on_string}: Loci CSV" >
+            <filter>(((theProjectIsNew["isnew"]=="yes") and (theProjectIsNew["howinit"]["inputs"]=="gb")) or
+                     ((theProjectIsNew["isnew"]=="no") and (theProjectIsNew["moreOptions"]["action"]=="writeloci")))</filter>
+        </data>
+        <data name="metaout" format='csv' label="${tool.name} on ${on_string}: Metadata CSV" >
+            <filter>(((theProjectIsNew["isnew"]=="yes") and (theProjectIsNew["howinit"]["inputs"]=="gb")) or 
+                     ((theProjectIsNew["isnew"]=="yes") and (theProjectIsNew["howinit"]["inputs"]=="both")) or
+                     (readData["newData"]!="no") or
+                     (theProjectIsNew["moreOptions"]["action"]=="writemeta"))
+            </filter>
+        </data>
+        <data name="reportName" from_work_dir="report_arcive.zip" format="data" label="${tool.name} on ${on_string}: Report archive">
+            <filter>((theProjectIsNew["isnew"]=="no") and (theProjectIsNew["moreOptions"]["action"]=="report"))</filter>
+        </data>
+        <data name="dumpzip" from_work_dir="alignments.zip" format="data" label="${tool.name} on ${on_string}: Sequence alignments archive">
+            <filter>((theProjectIsNew["isnew"]=="no") and (theProjectIsNew["moreOptions"]["action"]=="dump"))</filter>
+        </data>
+        <data name="gbout" format="txt" from_work_dir="gbout" label="${tool.name} on ${on_string}: Sequence records genbank file">
+            <filter>((theProjectIsNew["isnew"]=="no") and (theProjectIsNew["moreOptions"]["action"]=="dump"))</filter>
+        </data>
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Manage a Project"
+----------------
+This tool is the starting point when working with ReproPhylo in galaxy. It allows to:
+    
+1. Explore a genbank file
+
+2. Pick loci to analyze
+
+3. Add your own data
+
+4. Manipulate the metadata
+
+5. Run a quick exploratory phylogenetic analysis to make gene trees
+
+6. Print a detailed report of the analysis, specifically the taxonomic content, sequence
+and alignment statistics, the resulting trees and their pairwise comparison.
+
+Other ReproPhylo tools may then be used to create configure through phylogenetic analyses. 
+This help section provides use cases to illustrate the usage of this tool.
+
+Tetillidae Tutorial
+===================
+Geting reference data
+---------------------
+
+This tutorial will make use of the Tetillidae sequence in genbank. To get it, use the search
+phrase ``Tetillidae[orgn]`` in the NCBI Nucleotide database and download the matches as a genbank
+file
+
+1. Go to the NCBI Nucleotide page at http://www.ncbi.nlm.nih.gov/nuccore/
+        
+2. Paste the phrase ``Tetillidae[orgn]`` in the search box
+
+3. On the top right hand side click the drop down menu "Send to:"
+
+4. Choose "File"
+
+5. Choose "GenBank" in the "Format" drop down menu
+
+6. Click "Create File" and save the file
+
+
+
+
+</help>
+</tool>    

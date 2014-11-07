@@ -28,6 +28,9 @@ parser.add_argument("-m", "--dump_alignments",
                     help="print sequene alignment in the specified format",
                     type=str,
                     default=None)
+parser.add_argument("--dump_alignments_zip",
+                    type=str,
+                    default="alignments.zip")
 parser.add_argument("-p", "--dump_records",
                     help="print a genbank file of all records and metadata",
                     type=str,
@@ -43,6 +46,9 @@ parser.add_argument("-j", "--figs",
                     default='.')
 parser.add_argument("-_", "--__",
                     help=("Turn off warnings for Galaxy"),
+                    action="store_true")
+parser.add_argument("--noninteractive",
+                    help=("Overwrite reports without asking"),
                     action="store_true")
 #----------------------------------------------------------------------
 parser.add_argument("-f", "--fasta",
@@ -103,7 +109,7 @@ loci.add_argument("-u", "--add_locus",
                     help=("Add a locus to the analysis. "+
                           "Takes three space delimited values: "+
                           "[dna|prot] [CDS|rRNA|gene|...] locus_name"),
-                    type=str,
+                    type=str, nargs=3,
                     default=None)
 parser.add_argument("-b", "--banish_loci",
                     help=("Replace existing loci with"+
@@ -129,7 +135,7 @@ parser.add_argument("-x", "--overwrite",
                           " of current configuration"),
                     action="store_true")# Only with -s
 parser.add_argument("-v", "--verbose_report",
-                   help=("Write full html report"),
+                   help=("Write full html report to filename"),
                    type=str,
                    default=None)
 parser.add_argument("-c", "--version_ctrl",
@@ -148,12 +154,15 @@ if len([x for x in (cl.dump_alignments,
                     cl.read_loci_csv,
                     cl.write_meta_csv,
                     cl.read_meta_csv,
-                    cl.start) if ((x is not None) and  
+                    cl.start,
+                    cl.verbose_report) if ((x is not None) and  
                                   (x is not False))])== 0:
     parser.error('One of the following is required:\n'+
                  '--genbank\n--fasta\n--write_loci_csv\n'+
                  '--read_loci_csv\n--write_meta_csv\n'+
-                 '--read_meta_csv\n--start')
+                 '--read_meta_csv\n--start\nverbose_report\n'+
+                 '--dump_alignments\n--dump_alignments\n'+
+                 '--dump_records')
 #----------------------------------------------------------------------
 # The following go only with --fasta:
 if not cl.fasta and any([cl.feature,
@@ -204,7 +213,7 @@ def random_filename():
 
 def add_locus_from_cline():
     return Locus(cl.add_locus[0],cl.add_locus[1],
-                 cl.add_locus[2],cl.add_locus[2])
+                 cl.add_locus[2],[cl.add_locus[2]])
 
 # Functions to start a project and deal with a genbenk file and loci
 #----------------------------------------------------------------------
@@ -383,13 +392,20 @@ def deal_with_fasta(pj):
             fst_dnov_in_file = fst_dnov_in_next_file
 
 
+def removetype(path):
+    import shutil
+    if os.path.isdir(path):
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
 def extract_and_log_by_locus(pj):
+    print
+    print "---------------------------------------------"
+    print "The project now contains the following loci:".title()
+    print "---------------------------------------------"
     if len(pj.records)>0:
         pj.extract_by_locus()
-        print
-        print "---------------------------------------------"
-        print "The project now contains the following loci:".title()
-        print "---------------------------------------------"
         print ("Locus".ljust(30,' ')+"Records".ljust(10,' ')+
                "Sequence length (max min mean)")
         for l in pj.loci:
@@ -403,7 +419,17 @@ def extract_and_log_by_locus(pj):
             else:
                 print (str(l.name).ljust(30,' ')+'No records')
         if cl.verbose_report:
-            pj.publish(pj, cl.verbose_report, cl.figs)
+            if cl.noninteractive:
+                if os.path.exists(cl.verbose_report):
+                    removetype(cl.verbose_report)
+                if os.path.exists(cl.verbose_report.rpartition('.')[0]):
+                    removetype(cl.verbose_report.rpartition('.')[0])
+                if os.path.exists(cl.verbose_report+'.zip'):
+                    removetype(cl.verbose_report+'.zip')
+            publish(pj, cl.verbose_report, cl.figs)
+    else:
+        for l in pj.loci:
+            print l.name.ljust(30, ' ')+'No records'
                
               
 
@@ -465,9 +491,9 @@ def run_default_analysis(pj):
         
         
 def ref():
-    print '----------'
+    print '------------------'
     print 'Program References'
-    print '----------'
+    print '------------------'
     if cl.start:
         print '-------------------------------'
         print 'Exploratory Pipeline References'
@@ -579,14 +605,37 @@ if cl.verbose_report:
     print '---------------------------------'
     print ('Writing report to %s.zip'%cl.verbose_report).title()
     print '---------------------------------' 
+    if cl.noninteractive:
+        if os.path.exists(cl.verbose_report):
+            removetype(cl.verbose_report)
+            if os.path.exists(cl.verbose_report.rpartition('.')[0]):
+                removetype(cl.verbose_report.rpartition('.')[0])
+        if os.path.exists(cl.verbose_report+'.zip'):
+            removetype(cl.verbose_report+'.zip')
     publish(pj, cl.verbose_report, cl.figs)
 
+
+
 if cl.dump_alignments:
-    print '------------------------------------'
-    print ('Writing alignments in %s format'%cl.dump_alignments).title()
-    print '------------------------------------' 
-    pj.write_alns(format=cl.dump_alignments)
-    pj.write_trimmed_alns(format=cl.dump_alignments)
+    if len(pj.alignments.keys()+pj.trimmed_alignments.keys()) == 0:
+        print "No alignments to print"
+    else:
+        import zipfile, shutil
+        print '------------------------------------'
+        print ('Writing alignments in %s format'%cl.dump_alignments).title()
+        print '------------------------------------' 
+        aln_files = pj.write_alns(format=cl.dump_alignments)
+        trim_aln_files = pj.write_trimmed_alns(format=cl.dump_alignments)
+        os.makedirs(cl.dump_alignments_zip.rpartition('.')[0])
+        for filename in aln_files + trim_aln_files:
+            shutil.move(filename, cl.dump_alignments_zip.rpartition('.')[0]+'/'+filename.split('/')[-1])
+        zf = zipfile.ZipFile(cl.dump_alignments_zip, "w")
+        for dirname, subdirs, files in os.walk(cl.dump_alignments_zip.rpartition('.')[0]):
+            zf.write(dirname)
+            for filename in files:
+                zf.write(os.path.join(dirname, filename))
+        zf.close()
+        shutil.rmtree(cl.dump_alignments_zip.rpartition('.')[0])
     
 if cl.dump_records:
     print '------------------------------------'

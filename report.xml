@@ -1,0 +1,61 @@
+
+<tool id="Report" name="Report"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py 
+        $projin -_ -a $altprojout
+        #if (str($moreOptions.action)=="report")
+        -v report_arcive -j $moreOptions.figsdir  --noninteractive 
+        #end if
+        #if (str($moreOptions.action)=="dump")
+        -m $moreOptions.format -p gbout 
+        #end if
+        > $log
+    </command>
+    <inputs>
+        <param name="projin" type="data" label="Input Project file" />
+        <conditional name="moreOptions">
+            <param name="action" type="select" label="Misc Utils">
+                <option value="report">Dump a full report to zip file</option>
+                <option value="dump">Dump sequence alignments and reocrds</option>
+            </param>
+            <when value="report">
+                <param name="figsdir" type="text" label="Local path to figures"/>
+            </when>
+            <when value="dump">
+                <param name="format" type="select" label="Choose alignement format" >
+                    <option value="fasta">Fasta</option>
+                    <option value="phylip-relaxed">Phylip</option>
+                    <option value="nexus">Nexus</option>
+                    <option value="stockholm">Stockholm</option>
+                    <option value="clustal">Clustal</option>
+                </param>
+            </when>
+        </conditional>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+        <data name="reportName" from_work_dir="report_arcive.zip" format="data" label="${tool.name} on ${on_string}: Report archive">
+            <filter>(moreOptions["action"]=="report")</filter>
+        </data>
+        <data name="dumpzip" from_work_dir="alignments.zip" format="data" label="${tool.name} on ${on_string}: Sequence alignments archive">
+            <filter>(moreOptions["action"]=="dump")</filter>
+        </data>
+        <data name="gbout" format="txt" from_work_dir="gbout" label="${tool.name} on ${on_string}: Sequence records genbank file">
+            <filter>(moreOptions["action"]=="dump")</filter>
+        </data>
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Report"
+--------
+This tool can either dump all the seuqnece alignments (raw and trimmed) in the Project or print a verbose html report that includes
+all the methods and results, as well as statistics concerning the quality of sequence data, sequence alignments and trees.
+</help>
+</tool>    

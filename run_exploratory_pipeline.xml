@@ -1,0 +1,32 @@
+
+<tool id="Run Exploratory Pipeline" name="Run Exploratory Pipeline"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py
+        $projin -_ -a $altprojout
+        $overwrite -s  --threads $threads --noninteractive -j $figs
+        > $log
+    </command>
+    <inputs>
+        <param name="projin" type="data" label="Input Project file" />
+        <param name="threads" type="text" value="4" label="How many threads?"/>
+        <param name="overwrite" type="boolean" truevalue="-x" falsevalue="" label="Overwrite Project's analyses?"/>
+        <param name="figs" type="text" labe="A local directory to write the figures to"/>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Run Exploratory Pipeline"
+--------------------------
+Runs a quick exploratory gene tree reconstructions (specify pipeline here)
+
+</help>
+</tool>    

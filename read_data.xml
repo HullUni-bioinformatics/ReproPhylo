@@ -1,0 +1,70 @@
+
+<tool id="Read Data" name="Read Data"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        base_reprophylo.py
+        $projin -_ -a $altprojout
+        #if str($readData.newData)=="gb"
+        -g $genbankii $readData.replacedata -y $metaout
+        #else if str($readData.newData)=="fasta"
+        -f $fastafile -t $readData.fastaCharType -n $readData.GenName $readData.FeatureType $readData.replacedata -y $metaout
+        #else if str($readData.newData)=="both"
+        -g $genbankii -f $readData.fastafile -t $readData.fastaCharType -n $readData.GenName $readData.FeatureType $readData.replacedata -y $metaout
+        #end if
+        > $log
+    </command>
+    <inputs>
+        <param name="projin" type="data" label="Input Project file" />
+        <conditional name="readData">
+            <param name="newData" type="select" label="Read new data?">
+                <option value="gb">Read a genbank file</option>
+                <option value="fasta">Read a fasta file</option>
+                <option value="both">Read a fasta and a genbank file</option>
+            </param>
+            <when value="gb">
+                <param name="genbankii" type="data" label="Input genbank or embl file"/>
+                <param name="replacedata" type="boolean" truevalue="-e" falsevalue="" label="Replace data with new one?"/>
+            </when>
+            <when value="fasta">
+                <param name="fastafile" type="data" label="Input fasta file"/>
+                <param name="fastaCharType" type="select" label="DNA or Protein sequences?">
+                    <option value='dna'>DNA</option>
+                    <option value='prot'>Protein</option>
+                </param>
+                <param name='GenName' type="text" label="The gene name of the fasta sequences (eg cox1)"/>
+                <param name='FeatureType' type="text" lable="The fasta sequence feature type (eg CDS, rRNA...)"/>
+                <param name="replacedata" type="boolean" truevalue="-e" falsevalue="" label="Replace data with new one?"/>
+            </when>
+            <when value="both">
+                <param name="genbankii" type="data" label="Input genbank or embl file"/>
+                <param name="fastafile" type="data" lable="Input fasta file"/>
+                <param name="fastaCharType" type="select" label="DNA or Protein sequences?">
+                    <option value='dna'>DNA</option>
+                    <option value='prot'>Protein</option>
+                </param>
+                <param name='GenName' type="text" label="The gene name of the fasta sequences (eg cox1)"/>
+                <param name='FeatureType' type="text" lable="The fasta sequence feature type (eg CDS, rRNA...)"/>
+                <param name="replacedata" type="boolean" truevalue=" -e " falsevalue=" " label="Replace data with new one?"/>
+            </when>
+        </conditional>
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+        <data name="metaout" format='csv' label="${tool.name} on ${on_string}: Metadata CSV" />
+    </outputs>
+    <help>
+    
+
+ReproPhylo
+==========
+
+"Read Data"
+-----------
+This tool allows to add or replace the data in the project. You can choose whether the new data will replace the existing one 
+by checking ``Replace data with new one?``. If you read a fasta file you will need to feed in a char_type (dna or prot), 
+a feature_type (CDS, rRNA etc...) and a gene name.
+
+</help>
+</tool>    
