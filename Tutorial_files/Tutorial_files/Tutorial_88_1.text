@@ -1,2 +1,0 @@
-/usr/local/lib/python2.7/dist-packages/pandas/io/excel.py:626: UserWarning: Installed openpyxl is not supported at this time. Use >=1.6.1 and <2.0.0.
-  .format(openpyxl_compat.start_ver, openpyxl_compat.stop_ver))

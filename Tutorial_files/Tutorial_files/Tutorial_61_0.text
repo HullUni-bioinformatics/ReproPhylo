@@ -1,6 +1,0 @@
-raxmlHPC-PTHREADS-SSE3 -f D -m GTRGAMMA -n 856861415567330.81_28s@MuscleDefaults@gappyout0 -p 139 -s 856861415567330.81_28s@MuscleDefaults@gappyout.fasta -T 4 -N 1
-raxmlHPC-PTHREADS-SSE3 -f b -m GTRGAMMA -n 856861415567330.81_28s@MuscleDefaults@gappyout1 -p 878 -s 856861415567330.81_28s@MuscleDefaults@gappyout.fasta -t RAxML_bestTree.856861415567330.81_28s@MuscleDefaults@gappyout0 -T 4 -z RAxML_rellBootstrap.856861415567330.81_28s@MuscleDefaults@gappyout0
-raxmlHPC-PTHREADS-SSE3 -f D -m GTRGAMMA -n 856861415567330.81_18s@MuscleDefaults@gappyout0 -p 217 -s 856861415567330.81_18s@MuscleDefaults@gappyout.fasta -T 4 -N 1
-raxmlHPC-PTHREADS-SSE3 -f b -m GTRGAMMA -n 856861415567330.81_18s@MuscleDefaults@gappyout1 -p 187 -s 856861415567330.81_18s@MuscleDefaults@gappyout.fasta -t RAxML_bestTree.856861415567330.81_18s@MuscleDefaults@gappyout0 -T 4 -z RAxML_rellBootstrap.856861415567330.81_18s@MuscleDefaults@gappyout0
-raxmlHPC-PTHREADS-SSE3 -f D -m GTRGAMMA -n 856861415567330.81_MT-CO1@mafftLinsi@gappyout0 -p 437 -s 856861415567330.81_MT-CO1@mafftLinsi@gappyout.fasta -T 4 -N 1
-raxmlHPC-PTHREADS-SSE3 -f b -m GTRGAMMA -n 856861415567330.81_MT-CO1@mafftLinsi@gappyout1 -p 839 -s 856861415567330.81_MT-CO1@mafftLinsi@gappyout.fasta -t RAxML_bestTree.856861415567330.81_MT-CO1@mafftLinsi@gappyout0 -T 4 -z RAxML_rellBootstrap.856861415567330.81_MT-CO1@mafftLinsi@gappyout0
