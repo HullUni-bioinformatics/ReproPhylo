@@ -1,0 +1,1 @@
+mafft --localpair --maxiterate 1000 906441415567281.93_CDS_proteins_MT-CO1.fasta

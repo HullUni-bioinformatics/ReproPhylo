@@ -1,0 +1,2 @@
+raxmlHPC-PTHREADS-SSE3 -f D -m PROTGAMMAJTT -n 154301415570224.36_combined0 -q 154301415570224.36_combined_partfile -p 98 -s 154301415570224.36_combined.fasta -T 4 -N 1
+raxmlHPC-PTHREADS-SSE3 -f b -m PROTGAMMAJTT -n 154301415570224.36_combined1 -q 154301415570224.36_combined_partfile -p 762 -s 154301415570224.36_combined.fasta -t RAxML_bestTree.154301415570224.36_combined0 -T 4 -z RAxML_rellBootstrap.154301415570224.36_combined0
