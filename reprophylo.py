@@ -1009,12 +1009,13 @@ class Project:
                 #determine new feature id
                 feature_id = None
                 serials = []
-                for feature in record.features:
-                    if 'feature_id' in feature.qualifiers.keys():
-                        if '_f' in feature.qualifiers['feature_id']:
-                            f = feature.qualifiers['feature_id']
-                            serials.append(int(f.split('_')[1][1:]))
-                serials.sort(reverse = True)
+                if len(record.features) > 0:
+                    for feature in record.features:
+                        if 'feature_id' in feature.qualifiers.keys():
+                            if '_f' in feature.qualifiers['feature_id'][0]:
+                                f = feature.qualifiers['feature_id'][0]
+                                serials.append(int(f.split('_')[1][1:]))
+                    serials.sort(reverse = True)
                 if len(serials) > 0:
                     feature_id = record.id + '_f' + str(serials[0]+1)
                 else:
@@ -1625,6 +1626,7 @@ class Project:
         for locus in self.loci:
             if not locus.name in locus.aliases:
                 locus.aliases.append(locus.name)
+                locus.aliases.append(locus.name.replace('_',' '))
             records = []
             for record in self.records:
                 for feature in record.features:
@@ -1818,30 +1820,175 @@ class Project:
 
 
 
-    def write_alns(self, format = 'fasta'):
+    def write_alns(self, id=['feature_id'], format = 'fasta'):
         filenames = []
         if len(self.alignments.keys()) == 0:
             raise IOError('Align the records first')
         else:
             for key in self.alignments:
-                AlignIO.write(self.alignments[key], key+'_aln.'+format, format)
+                aln = self.alignments[key]
+                records = []
+                for s in aln:
+                    qualifiers = get_qualifiers_dictionary(self, s.id)
+                    new_id = ""
+                    for i in id:
+                        if i in qualifiers.keys():
+                            new_id += qualifiers[i]+'_'
+                    if new_id == "":
+                        new_id = s.id
+                    else:
+                        new_id = new_id[:-1]
+                    records.append(SeqRecord(seq=s.seq, id=new_id))
+                SeqIO.write(records, key+'_aln.'+format, format)
                 filenames.append(key+'_aln.'+format)
         return filenames
 
 
 
-    def write_trimmed_alns(self, format = 'fasta'):
+    def write_trimmed_alns(self, id=['feature_id'], format = 'fasta'):
         filenames = []
         if len(self.trimmed_alignments.keys()) == 0:
             raise IOError('Align and trimmed the records first')
         else:
             for key in self.trimmed_alignments.keys():
-                AlignIO.write(self.trimmed_alignments[key], key+'_trimmed_aln.'+format, format)
+                aln = self.trimmed_alignments[key]
+                records = []
+                for s in aln:
+                    qualifiers = get_qualifiers_dictionary(self, s.id)
+                    new_id = ""
+                    for i in id:
+                        if i in qualifiers.keys():
+                            new_id += qualifiers[i]+'_'
+                    if new_id == "":
+                        new_id = s.id
+                    else:
+                        new_id = new_id[:-1]
+                    records.append(SeqRecord(seq=s.seq, id=new_id))
+                SeqIO.write(records, key+'_trimmed_aln.'+format, format)
                 filenames.append(key+'_trimmed_aln.'+format)
         return filenames
 
-
-
+    def show_aln(self, token, id=['feature_id']):
+        aln_obj=None
+        if token in self.alignments.keys():
+            aln_obj = self.alignments[token]
+        elif token in self.trimmed_alignments.keys():
+            aln_obj = self.trimmed_alignments[token]
+        locus_name = token.split('@')[0]
+        char_type = [locus.char_type for locus in self.loci if locus.name == locus_name][0]
+        
+        records = []
+        for s in aln_obj:
+            qualifiers = get_qualifiers_dictionary(self, s.id)
+            new_id = ""
+            for i in id:
+                if i in qualifiers.keys():
+                    new_id += qualifiers[i]+'_'
+            if new_id == "":
+                new_id = s.id
+            else:
+                new_id = new_id[:-1]
+            records.append(SeqRecord(seq=s.seq, id=new_id))
+            
+        title_length = max([len(r.id) for r in records])+2
+        
+        # colors
+        dna_colors = {'a':'green',
+                      'A':'green',
+                      'T':'red',
+                      't':'red',
+                      'g':'lightgray',
+                      'G':'lightgray',
+                      'c':'blue',
+                      'C':'blue'
+                      }
+        protein_colors = {'R':'blueviolet',
+                          'r':'blueviolet',
+                          
+                          'K':'cornflowerblue',
+                          'k':'cornflowerblue',
+                          
+                          'E':'red',
+                          'e':'red',
+                          
+                          'D':'crimson',
+                          'd':'crimson',
+                          
+                          'I':'gold',
+                          'i':'gold',
+                          
+                          'L':'yellow',
+                          'l':'yellow',
+                          
+                          'V':'moccasin',
+                          'v':'moccasin',
+                          
+                          'A':'lemonchiffon',
+                          'a':'lemonchiffon',
+                          
+                          'C':'palegreen',
+                          'c':'palegreen',
+                          
+                          'H':'paleturquoise',
+                          'h':'paleturquoise',
+                          
+                          'M':'hotpink',
+                          'm':'hotpink',
+                          
+                          'N':'pink',
+                          'n':'pink',
+                          
+                          'Q':'yellow',
+                          'q':'yellow',
+                          
+                          'F':'darkseagreen',
+                          'f':'darkseagreen',
+                          
+                          'Y':'darkcyan',
+                          'y':'darkcyan',
+                          
+                          'W':'steelblue',
+                          'w':'steelblue',
+                          
+                          
+                          'S':'thistle',
+                          's':'thistle',
+                          
+                          'T':'lavender',
+                          't':'lavender',
+                          
+                          'G':'darkgray',
+                          'g':'darkgray',
+                          
+                          'P':'gainsboro',
+                          'p':'gainsboro',
+                          }
+        colors = None
+        if char_type == 'dna':
+            colors = dna_colors
+        elif char_type == 'prot':
+            colors = protein_colors
+        linelength = (len(records[0].seq)+len(records[0].id)+3)*10
+        html_string = '<html><head></head>\n'
+        html_string += '<body><pre><font face="Courier New">\n'
+        for r in records:
+            html_string += r.id.ljust(title_length, '.')
+            for p in str(r.seq):
+                c = 'white'
+                if p in colors.keys():
+                    c = colors[p]
+                html_string += '<font style="BACKGROUND-COLOR: %s">%s</font>'%(c, p)
+            html_string += "<br>"
+        html_string +=  '</font></pre></body></html>' 
+        
+        import webbrowser
+        path = os.path.abspath("%s.html"%token)
+        url = 'file://' + path
+        with open(path, 'w') as f:
+            f.write(html_string)
+        webbrowser.open_new_tab(url)
+        
+    
     def tree(self, raxml_methods, bpcomp='default'):
         # to do: determine the program used and the resulting expected tree file name
         
@@ -2233,6 +2380,109 @@ class Project:
                 
                 draw_boxplot(stat_dict, ylabel, 'inline')
                 
+    ##################################               
+    # Project methods to fetch objects
+    ##################################
+    
+    def ft(self, token):
+        
+        """
+        Will fetch the tree object which has the token in 
+        its key, as long as there is only one
+        """
+        
+        # check how many tree keys match the token
+        keys = [key for key in self.trees.keys() if token in key]
+        if len(keys) > 1:
+            raise IOError("The token %s was found in more then one tree key: %s"
+                           %(token, str(keys)))
+        elif len(keys) == 0:
+            raise IOError("The token %s was not found in any tree key"
+                           %token)
+        elif len(keys) == 1:
+            print "returning tree object %s"%keys[0]
+            return self.trees[keys[0]][0]    
+        
+        
+        
+    def fa(self, token):
+        
+        """
+        Will fetch the alignment object which has the token in 
+        its key, as long as there is only one
+        """
+        
+        # check how many aln keys match the token
+        keys = [key for key in self.alignments.keys() if token in key]
+        if len(keys) > 1:
+            raise IOError("The token %s was found in more then one alignment key: %s"
+                          %(token, str(keys)))
+        elif len(keys) == 0:
+            raise IOError("The token %s was not found in any alignment key"
+                          %token)
+        elif len(keys) == 1:
+            print "returning alignment object %s"%keys[0]
+            return self.alignments[keys[0]]        
+        
+        
+    def fta(self, token):
+        
+        """
+        Will fetch the trimmed alignment object which has the token in 
+        its key, as long as there is only one
+        """
+        
+        # check how many trimmed aln keys match the token
+        keys = [key for key in self.trimmed_alignments.keys() if token in key]
+        if len(keys) > 1:
+            raise IOError("The token %s was found in more then one trimmed alignment key: %s"
+                          %(token, str(keys)))
+        elif len(keys) == 0:
+            raise IOError("The token %s was not found in any trimmed alignment key"
+                          %token)
+        elif len(keys) == 1:
+            print "returning trimmed alignment object %s"%keys[0]
+            return self.trimmed_alignments[keys[0]]            
+        
+        
+    def fr(self, locus_name, filter=None):
+        
+        """
+        Will fetch the record objects of the specified locus, 
+        as long as there is at least one.
+        filter should be a list of lists. Every (sub)list is
+        a pair of qualifier and value. If filter is specified,
+        only records that have all the specified values in the
+        specified qualifiers will be kept.
+        """
+        
+        # check how many record keys match the token
+        keys = [key for key in self.records_by_locus.keys() if locus_name in key]
+        if len(keys) > 1:
+            raise IOError("The locus name %s fits more then one locus: %s"
+                          %(locus_name, str(keys)))
+        elif len(keys) == 0:
+            raise  IOError("The locus %s was not found"
+                           %locus_name)
+        elif len(keys) == 1:
+            records = []
+            if filter:
+                for r in self.records_by_locus[keys[0]]:
+                    qualifiers = get_qualifiers_dictionary(self, r.id)
+                    get = True
+                    for f in filter:
+                        if not (f[0] in qualifiers.keys() and qualifiers[f[0]] == f[1]):
+                            get = False
+                    if get:
+                        records.append(r) 
+            else:
+                for r in self.records_by_locus[keys[0]]:
+                    records.append(r)
+            print "returning records list of locus %s and filter %s"%(keys[0], str(filter))
+            return records
+        
+   
+                
 ##############################################################################################
 class AlnConf:
 ##############################################################################################
@@ -2296,7 +2546,7 @@ class AlnConf:
                 self.CDS_in_frame[locus.name] = []
                 for record in pj.records:
                     for feature in record.features:
-                        if (not feature.type == 'source' and 'gene' in feature.qualifiers.keys() and
+                        if (feature.type == 'CDS' and 'gene' in feature.qualifiers.keys() and
                             feature.qualifiers['gene'][0] in locus.aliases):
                             S = feature.extract(record.seq)
                             # Make in-frame CDS input file seq start in frame
@@ -2311,7 +2561,7 @@ class AlnConf:
                                 S = S[:-2]  
                             # make protein input file seq
                             if not 'translation' in feature.qualifiers.keys():
-                                raise IOError("Feature %s has not 'translation' qualifier"%
+                                raise IOError("Feature %s has no 'translation' qualifier"%
                                               feature.qualifiers['feature_id'][0])
                             P = Seq(feature.qualifiers['translation'][0], IUPAC.protein)
                             # Remove 3' positions that are based on partial codons
@@ -3488,6 +3738,9 @@ def view_csv_as_table(csv_filename, delimiter, quotechar='|'):
             for i in range(len(row)):
                 string += row[i].ljust(field_sizes[i]+3)
             print string
+            
+
+    
 
 if __name__ == "__main__":
     import doctest
