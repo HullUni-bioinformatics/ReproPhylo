@@ -946,7 +946,7 @@ class Project:
         for record in self.records:
             if 'denovo' in record.id:
                 serial = int(record.id[6:])
-                if serial > count:
+                if serial >= count:
                     count = serial+1
         for input_filename in input_filenames:
             if __builtin__.git:
@@ -961,6 +961,9 @@ class Project:
                 record.name = record.id
                 source.qualifiers['feature_id'] = [record.id+'_source']
                 record.features = [source]
+                if '-' in str(record.seq):
+                    record.seq = Seq(str(record.seq).replace('-',''))
+                    warnings.warn("Reseting gaps in records from %s"%input_filename)
                 if char_type == 'prot':
                     record.seq.alphabet = IUPAC.protein
                     #feature = SeqFeature(FeatureLocation(0, len(record.seq)), type='Protein', strand=1)
@@ -976,7 +979,98 @@ class Project:
             comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
             rpgit.gitCommit(comment)
         return count       
-               
+    
+    def read_alignment(self, filename, char_type, feature_type, locus_name, format="fasta", aln_method_name = "ReadDirectly", exclude=[]):
+    
+        if __builtin__.git:
+            import rpgit
+        else:
+            warnings.warn('Version control off')
+            
+        if not any([locus.name == locus_name for locus in self.loci]):
+            raise RuntimeError("Locus %s does not exist"%locus_name)
+        elif not [locus for locus in self.loci if locus.name == locus_name][0].char_type == char_type:
+            raise RuntimeError("%s is not a %s locus"%(locus_name, char_type))
+        elif not [locus for locus in self.loci if locus.name == locus_name][0].feature_type == feature_type:
+            raise RuntimeError("The feature_type %s is not %s"%(locus_name, feature_type))
+            
+        count = 0
+        # start the counter where it stoped the last time we read denovo things
+        for record in self.records:
+            if 'denovo' in record.id:
+                serial = int(record.id[6:])
+                if serial >= count:
+                    count = serial+1
+        # Read the alignment:
+        raw_aln_input = list(AlignIO.read(filename, format))
+        
+        # make records
+        records = []
+        aln_records = []
+        for record in raw_aln_input:
+            if not record.id in exclude:
+                # remove gaps
+                new_record = SeqRecord(seq=Seq(str(record.seq).replace('-','').replace('.','')))
+                aln_record = SeqRecord(seq=Seq(str(record.seq).replace('.','-')))
+                
+                #set alphabet
+                if char_type == 'prot':
+                    new_record.seq.alphabet = IUPAC.protein
+                    aln_record.seq.alphabet = IUPAC.protein
+                    
+                elif char_type == 'dna':
+                    new_record.seq.alphabet = IUPAC.ambiguous_dna
+                    aln_record.seq.alphabet = IUPAC.ambiguous_dna
+                    
+                # set denovo record id
+                new_record.id = 'denovo%i'%count
+                new_record.name = new_record.id
+                
+                # set source and first feature
+                source = SeqFeature(FeatureLocation(0, len(new_record.seq)), type='source', strand=1)
+                source.qualifiers['original_id'] = [record.id]
+                source.qualifiers['original_desc'] = [(' ').join(record.description.split()[1:])]
+                source.qualifiers['feature_id'] = [new_record.id+'_source']
+                feature = SeqFeature(FeatureLocation(0, len(new_record.seq)), type=feature_type, strand=1)
+                feature.qualifiers['feature_id'] = [new_record.id+'_f0']
+                feature.qualifiers['gene'] = [locus_name]
+                feature_seq = feature.extract(new_record.seq)
+                degen = len(feature_seq)
+                if char_type == 'dna':    
+                    for i in ['A','T','G','C','U','a','t','g','c','u']:
+                        degen -= feature_seq.count(i)
+                    feature.qualifiers['GC_content'] = [str(GC(feature_seq))]
+                    feature.qualifiers['nuc_degen_prop'] = [str(float(degen)/len(feature_seq))]
+                    warnings.warn("To get translations, aff a feature manually")
+                elif char_type == 'prot': 
+                    degen = 0
+                    for i in ['B', 'X', 'Z', 'b', 'x', 'z']:
+                        degen += feature_seq.count(i)
+                    feature.qualifiers['prot_degen_prop'] = [str(float(degen)/len(feature_seq))]   
+                new_record.features = [source, feature]
+                
+                aln_record.id = 'denovo%i_f0'%count
+                
+                count += 1
+                
+                records.append(new_record)
+                aln_records.append(aln_record)
+            
+        token = "%s@%s"%(locus_name, aln_method_name)
+        
+        if token in self.alignments.keys():
+            warnings.warn("Replacing alignment %s"%token)
+        # need to add the denovo id's inside the alignment    
+        self.alignments[token] = MultipleSeqAlignment(aln_records)
+        self.records += records
+        self.extract_by_locus()
+                          
+            
+            
+        if __builtin__.git:
+            import rpgit
+            comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
+            rpgit.gitCommit(comment)
                
     def add_feature_to_record(self, record_id, feature_type, location='full', qualifiers={}):
     
@@ -1897,6 +1991,8 @@ class Project:
                       'A':'green',
                       'T':'red',
                       't':'red',
+                      'U':'red',
+                      'u':'red',
                       'g':'lightgray',
                       'G':'lightgray',
                       'c':'blue',
