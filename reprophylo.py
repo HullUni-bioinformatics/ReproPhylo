@@ -814,6 +814,12 @@ class Project:
         """
         self.records = []
         self.starttime = str(time.asctime())
+        self.user = None
+        if os.path.isfile('USER'):
+            self.user = []
+            for line in open('USER','r').readlines():
+                key, arg = line.rstrip().split('=')
+                self.user.append([key, arg])
         self.loci = loci
         self.records_by_locus = {}
         self.concatenations = []
@@ -896,8 +902,20 @@ class Project:
                         self.records.append(dwindled_record)
         if __builtin__.git:
             import rpgit
-            comment = "%i genbank/embl data file(s) from %s" % (len(input_filenames_list), time.asctime())
-            rpgit.gitCommit(comment)          
+            comment = "%i genbank/embl data file(s) from %s" % (len(input_filenames_list), time.asctime()) 
+            for filename in input_filenames_list:
+                rpgit.gitAdd(filename)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                rpgit.gitAdd(match)    
+            rpgit.gitCommit(comment) 
             
         
         
@@ -977,6 +995,18 @@ class Project:
         if __builtin__.git:
             import rpgit
             comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
+            for filename in input_filenames:
+                rpgit.gitAdd(filename)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                rpgit.gitAdd(match)
             rpgit.gitCommit(comment)
         return count       
     
@@ -1041,7 +1071,7 @@ class Project:
                         degen -= feature_seq.count(i)
                     feature.qualifiers['GC_content'] = [str(GC(feature_seq))]
                     feature.qualifiers['nuc_degen_prop'] = [str(float(degen)/len(feature_seq))]
-                    warnings.warn("To get translations, aff a feature manually")
+                    warnings.warn("To get translations, add a feature manually")
                 elif char_type == 'prot': 
                     degen = 0
                     for i in ['B', 'X', 'Z', 'b', 'x', 'z']:
@@ -1064,14 +1094,23 @@ class Project:
         self.alignments[token] = MultipleSeqAlignment(aln_records)
         self.records += records
         self.extract_by_locus()
-                          
-            
-            
+        
         if __builtin__.git:
             import rpgit
-            comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
+            comment = "Alignment file %s" % (time.asctime())
+            rpgit.gitAdd(filename)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                rpgit.gitAdd(match)
             rpgit.gitCommit(comment)
-               
+
     def add_feature_to_record(self, record_id, feature_type, location='full', qualifiers={}):
     
         """
@@ -1451,6 +1490,22 @@ class Project:
                                 else:
                                     line.append('null')
                             linewriter.writerow(line)
+        
+        if __builtin__.git:
+            import rpgit
+            comment = "Records %s text file from %s" % (format, time.asctime())
+            rpgit.gitAdd(filename)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                rpgit.gitAdd(match)
+            rpgit.gitCommit(comment)
 
     def correct_metadata_from_file(self,csv_file):
         metadata = read_feature_quals_from_tab_csv(csv_file)
@@ -1479,6 +1534,22 @@ class Project:
                 new_records.append(record)
         
         self.records = new_records
+        
+        if __builtin__.git:
+            import rpgit
+            comment = "Corrected metadata CSV file from %s" % (time.asctime())
+            rpgit.gitAdd(csv_file)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                rpgit.gitAdd(match)
+            rpgit.gitCommit(comment)
                 
     def if_this_then_that(self, IF_THIS, IN_THIS, THEN_THAT, IN_THAT, mode = 'whole'):
         
@@ -2745,6 +2816,8 @@ class TrimalConf:
     def __init__(self, pj, method_name='gappyout', program_name='trimal',
                  cmd='default', alns='all', trimal_commands=dict(gappyout=True)):
         
+        if len(pj.alignments) == 0:
+            raise RuntimeError("No sequence alignments found")
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.program_name=program_name
@@ -2962,13 +3035,18 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                 presets[preset][cline] = dict({'-q': partfile}, **presets[preset][cline])               
     return presets[tree_method.preset] 
 
-
+##############################################################################################
 class RaxmlConf:
-    
+##############################################################################################
     
     def __init__(self, pj, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
                  cmd='default', preset = 'fa', alns='all', model='GAMMA', matrix='JTT', threads=4,
                  cline_args={}):
+        
+        
+        if len(pj.trimmed_alignments) == 0:
+            raise RuntimeError("No trimmed sequence alignments found")
+            
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.program_name=program_name
@@ -3139,6 +3217,13 @@ def report_methods(pj, figs_folder, output_directory):
 
         
         #############################  section 1:   DATA  #######################
+        
+        if pj.user:
+            report_lines += ['<h2>','User Info','</h2>', '']
+            for item in pj.user:
+                report_lines += ['<strong>%s: </strong>'%item[0], str(item[1])]
+            report_lines += ['']
+        
         report_lines += ['<h2>','Data','</h2>', '']
         
         print "now printing species table"
@@ -3445,10 +3530,33 @@ def report_methods(pj, figs_folder, output_directory):
         
         # This prints things like num of unique seqs and num of parsimony informative
         # cloumns. Takes the info from 'pj.aln_summaries' which is a list of strings.
+        # Alignment length: 1566
+        #Number of rows: 94
+        #Unique sequences: 87
+        #Average gap prop.: 0.488445
+        #Variable columns: 1045
+        #Parsimony informative: 402
+        #Undetermined sequences: 0
+        
+        
         if len(pj.aln_summaries)>0:
+            report_lines += [('<pre>Name=Alignment name\n'+
+                              'NumPos=Alignment length\n'+
+                              'NumSeq=Number of sequences\n'+
+                              'Unique=Number of unique sequences\n'+
+                              'GapProp=Average gap proportion\n'+
+                              'VarCols=Total variable positions\n'+
+                              'ParsInf=Parsimony informative positions\n'+
+                              'UnSeqs=Completely undetermined sequences (only gaps)\n</pre>')]
+            T = [['Name','NumPos','NumSeq','Unique','GapProp','VarCols','ParsInf','UnSeqs']]
             for summary in pj.aln_summaries:
-                report_lines += ('<h4>', summary.splitlines()[0], '</h4>', '')
-                report_lines += ['',summary.partition('\n')[-1],'']
+                line = []
+                for i in summary.splitlines():
+                    line.append(i.split(': ')[1])
+                T.append(line)
+            report_lines += ['',
+                             HTML.table(T[1:], header_row=T[0]),
+                             '']
         else:
             report_lines += ['','No sequence alignments in this Project','']
                 
@@ -3726,7 +3834,8 @@ def calc_rf(pj, figs_folder):
     
     row_labels = [str(i) for i in range(len(trees))]
     column_labels = row_labels
-    legend = ['#'.ljust(10,' ')+'LOCUS'.ljust(20,' ')+'ALIGNMENT METHOD'.ljust(20,' ')+'TRIMMING METHOD'.ljust(20,' ')+'TREE METHOD'.ljust(20,' ')]
+    legend = ['#'.ljust(10,' ')+'LOCUS'.ljust(20,' ')+'ALIGNMENT METHOD'.ljust(20,' ')+
+              'TRIMMING METHOD'.ljust(20,' ')+'TREE METHOD'.ljust(20,' ')]
     for i in trees:
         line = str(trees.index(i)).ljust(10,' ')
         for val in i.split('@'):
