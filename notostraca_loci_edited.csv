@@ -1,0 +1,112 @@
+
+dna,rRNA,18s,18S ribosomal RNA,9
+dna,rRNA,28S_rRNA,28S rRNA
+dna,rRNA,28s,28S large subunit ribosomal RNA,28S ribosomal RNA
+dna,CDS,AQP,AQP
+dna,CDS,ASH1,ASH1
+dna,CDS,ASH2,ASH2
+dna,CDS,Act,Act
+dna,CDS,Apsk,Apsk
+dna,CDS,Arr,Arr
+dna,CDS,CDC5-related_protein,CDC5-related protein
+dna,CDS,DKC1,DKC1
+dna,CDS,DPD1,DPD1
+dna,CDS,Dll,Dll
+dna,CDS,G_protein-coupled_receptor_kinase_1,G protein-coupled receptor kinase 1
+dna,CDS,H3,H3
+dna,CDS,HIF-1alpha,HIF-1alpha
+dna,CDS,MT-ATP6,ATP6,atp6
+dna,CDS,MT-ATP8,ATP8,atp8
+dna,CDS,MT-CO1,coi,COI,COX1,cox1,cytochrome c oxidase subunit I
+dna,CDS,MT-CO2,COII,COX2,cox2
+dna,CDS,MT-CO3,COIII,COX3,cox3
+dna,CDS,MT-CYB,cytb,CYTB
+dna,CDS,MT-ND1,nad1,ND1
+dna,CDS,MT-ND2,nad2,ND2
+dna,CDS,MT-ND3,nad3,ND3
+dna,CDS,MT-ND4,nad4,ND4
+dna,CDS,MT-ND4L,nad4l,ND4L
+dna,CDS,MT-ND5,nad5,ND5
+dna,CDS,MT-ND6,nad6,ND6
+dna,CDS,R2_protein,R2 protein
+dna,CDS,RNA_polymerase_II_largest_subunit,RNA polymerase II largest subunit
+dna,CDS,RPB1,RPB1
+dna,CDS,RPB2,RPB2
+dna,CDS,RhA,RhA
+dna,CDS,RhB,RhB
+dna,CDS,RhC,RhC
+dna,CDS,RhD,RhD
+dna,CDS,RhE,RhE
+dna,CDS,RpL32,RpL32
+dna,CDS,SH2_domain_binding_protein,SH2 domain binding protein
+dna,CDS,Wnt-1,Wnt-1
+dna,CDS,cad,cad
+dna,CDS,carnitine_palmitoyltransferase_family_member_cpt-2,carnitine palmitoyltransferase family member cpt-2
+dna,CDS,cob,cob
+dna,CDS,dac,dac
+dna,CDS,ef1a,elongation factor 1-alpha,elongation factor-1 alpha
+dna,CDS,elongation_factor-2,elongation factor-2
+dna,CDS,glucose_phosphate_isomerase,glucose phosphate isomerase
+dna,CDS,glycogen_synthase,glycogen synthase
+dna,rRNA,l-rRNA,l-rRNA
+dna,CDS,neurofibromin,neurofibromin
+dna,CDS,nucleolar_cysteine-rich_protein,nucleolar cysteine-rich protein
+dna,CDS,phosphatidylinositol_kinase,phosphatidylinositol kinase
+dna,CDS,prophenoloxidase,prophenoloxidase
+dna,CDS,putative_26S_proteasome_non-ATPase_regulatory_subunit_2,putative 26S proteasome non-ATPase regulatory subunit 2
+dna,CDS,putative_6-phosphogluconate_dehydrogenase,putative 6-phosphogluconate dehydrogenase
+dna,CDS,putative_AATS-ALA_protein,putative AATS-ALA protein
+dna,CDS,putative_ACC_protein,putative ACC protein
+dna,CDS,putative_AMP_deaminase_2,putative AMP deaminase 2
+dna,CDS,putative_C-1-tetrahydrofolate_synthetase,putative C-1-tetrahydrofolate synthetase
+dna,CDS,putative_CG9461-like_protein,putative CG9461-like protein
+dna,CDS,putative_DNA-directed_RNA_polymerase_II_subunit_2,putative DNA-directed RNA polymerase II subunit 2
+dna,CDS,putative_DNA_replication_licensing_factor_MCM2,putative DNA replication licensing factor MCM2
+dna,CDS,putative_GMP_synthetase,putative GMP synthetase
+dna,CDS,putative_GTP-binding_protein,putative GTP-binding protein
+dna,CDS,putative_N-terminal_acetyltransferase_complex_ARD1_subunit-like_protein,putative N-terminal acetyltransferase complex ARD1 subunit-like protein
+dna,CDS,putative_U5_snRNP_100_kDa_protein,putative U5 snRNP 100 kDa protein
+dna,CDS,putative_UDP-N-acetylglucosamine--peptide_N-acetylglucosaminyltransferase,putative UDP-N-acetylglucosamine--peptide N-acetylglucosaminyltransferase
+dna,CDS,putative_alpha-adaptin-like_protein,putative alpha-adaptin-like protein
+dna,CDS,putative_alpha-spectrin_protein,putative alpha-spectrin protein
+dna,CDS,putative_bifunctional_aminoacyl-tRNA_synthetase,putative bifunctional aminoacyl-tRNA synthetase
+dna,CDS,putative_calcium_calmodulin-dependent_protein_kinase_type_II_delta_chain,putative calcium/calmodulin-dependent protein kinase type II delta chain
+dna,CDS,putative_casein_kinase,putative casein kinase
+dna,CDS,putative_clathrin_coat_assembly_protein,putative clathrin coat assembly protein
+dna,CDS,putative_clathrin_heavy_chain,putative clathrin heavy chain
+dna,CDS,putative_dynamin-1,putative dynamin-1
+dna,CDS,putative_flightless_I-like_protein,putative flightless I-like protein
+dna,CDS,putative_glucosamine-6-phosphate_isomerase,putative glucosamine-6-phosphate isomerase
+dna,CDS,putative_glucose-6-phosphate_1-dehydrogenase,putative glucose-6-phosphate 1-dehydrogenase
+dna,CDS,putative_glutaminyl-tRNA_synthetase,putative glutaminyl-tRNA synthetase
+dna,CDS,putative_glycogen_synthase,putative glycogen synthase
+dna,CDS,putative_histidyl-tRNA_synthetase,putative histidyl-tRNA synthetase
+dna,CDS,putative_histone_deacetylase_1,putative histone deacetylase 1
+dna,CDS,putative_hypothetical_44.9_kDa_protein,putative hypothetical 44.9 kDa protein
+dna,CDS,putative_integrin-linked_protein_kinase,putative integrin-linked protein kinase
+dna,CDS,putative_leucyl-tRNA_synthetase,putative leucyl-tRNA synthetase
+dna,CDS,putative_methionine_aminopeptidase_2,putative methionine aminopeptidase 2
+dna,CDS,putative_methylmalonate-semialdehyde_dehydrogenase,putative methylmalonate-semialdehyde dehydrogenase
+dna,CDS,putative_myosin_VIIa,putative myosin VIIa
+dna,CDS,putative_neuroendocrine_convertase_2_precursor,putative neuroendocrine convertase 2 precursor
+dna,CDS,putative_pre-mRNA_splicing_factor_RNA_helicase,putative pre-mRNA splicing factor RNA helicase
+dna,CDS,putative_protein_arginine_N-methyltransferase_1,putative protein arginine N-methyltransferase 1
+dna,CDS,putative_protein_phosphatase_PP2A_55kDa_regulatory_subunit,putative protein phosphatase PP2A 55kDa regulatory subunit
+dna,CDS,putative_rudimentary_protein,putative rudimentary protein
+dna,CDS,putative_serine_threonine_protein_kinase_24,putative serine/threonine protein kinase 24
+dna,CDS,putative_signal_recognition_particle_protein,putative signal recognition particle protein
+dna,CDS,putative_splicing_factor,putative splicing factor
+dna,CDS,putative_splicing_factor_3B_subunit_1,putative splicing factor 3B subunit 1
+dna,CDS,putative_syntaxin_1A,putative syntaxin 1A
+dna,CDS,putative_transmembrane_9_superfamily_protein_member_2_precursor,putative transmembrane 9 superfamily protein member 2 precursor
+dna,CDS,putative_triosephosphate_isomerase,putative triosephosphate isomerase
+dna,CDS,putative_vacuolar_ATP_synthase_subunit_B,putative vacuolar ATP synthase subunit B
+dna,CDS,putative_vacuolar_ATP_synthase_subunit_d_1,putative vacuolar ATP synthase subunit d 1
+dna,CDS,reverse_transcriptase,reverse transcriptase
+dna,rRNA,rrnL,16S ribosomal RNA,16S rRNA,rrnL
+dna,rRNA,rrnS,12S ribosomal RNA,12S rRNA,rrnS
+dna,CDS,rt,rt
+dna,rRNA,s-rRNA,s-rRNA
+dna,rRNA,small_subunit_ribosomal_RNA,small subunit ribosomal RNA,9
+dna,CDS,vacuolar_ATP_synthase_subunit_B,vacuolar ATP synthase subunit B
+dna,CDS,wnt-10,wnt-10

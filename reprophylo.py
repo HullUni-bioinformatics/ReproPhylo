@@ -691,16 +691,16 @@ def count_positions(aln_column):
 def global_aln_stats(aln_obj):
     total_gaps = 0
     prop_list = []
-    non_uniform_count = 0
+    non_uniform_count = aln_obj.get_alignment_length()
     parsimony_informative = 0
     for i in range(aln_obj.get_alignment_length()):
         total_gaps += aln_obj[:, i].count('-')
         prop_list.append(aln_obj[:, i].count('-')/float(len(aln_obj)))
         if len(count_positions(aln_obj[:, i]).keys()) == 1:
-            non_uniform_count += 1
+            non_uniform_count -= 1
         elif (len(count_positions(aln_obj[:, i]).keys()) == 2 and
               '-' in  count_positions(aln_obj[:, i]).keys()):
-            non_uniform_count += 1
+            non_uniform_count -= 1
         if len([p for p in count_positions(aln_obj[:, i]).keys() if (p != '-' and  count_positions(aln_obj[:, i])[p] > 1)]) > 1:
             parsimony_informative += 1
     mean_gap_prop = sum(prop_list)/aln_obj.get_alignment_length()
@@ -708,10 +708,12 @@ def global_aln_stats(aln_obj):
 
 def count_undetermined_lines(aln_obj):
     count = 0
+    ids = []
     for seq in aln_obj:
         if str(seq.seq).count('-') == aln_obj.get_alignment_length():
             count += 1
-    return count
+            ids.append(seq.id)
+    return count, ids
 
 def count_collapsed_aln_seqs(aln_obj):
     count = 1
@@ -729,7 +731,7 @@ def aln_summary(aln_obj):
              "Unique sequences: %i"%count_collapsed_aln_seqs(aln_obj),
              "Average gap prop.: %f\nVariable columns: %i\nParsimony informative: %i"
              %global_aln_stats(aln_obj),
-             "Undetermined sequences: %i"%count_undetermined_lines(aln_obj)
+             "Undetermined sequences: %i"%(count_undetermined_lines(aln_obj)[0])
              ]
     return [lines, len(aln_obj), count_undetermined_lines(aln_obj), count_collapsed_aln_seqs(aln_obj)]        
             
@@ -1251,6 +1253,20 @@ class Project:
         """
         
         if isinstance(concatenation_object, Concatenation):
+            # correct characters offending raxml, back up original values
+            meta = concatenation_object.otu_meta
+            self.copy_paste_within_feature(meta, "original_%s"%meta)
+            offensive = ['\t','\r','\n', "'", '"', ',', ' ',
+                         ';', ':', ']','[','(',')','/']
+            for r in self.records:
+                for f in r.features:
+                    if meta in f.qualifiers.keys():
+                        for o in offensive:
+                            if o in f.qualifiers[meta][0]:
+                                print (("found raxml offensive char %s in OTU %s. Replacing with '_ro_'."+
+                                        "Backing up original in the qualifier original_%s.")%(o, f.qualifiers[meta][0], meta))
+                                f.qualifiers[meta][0] = f.qualifiers[meta][0].replace(o,'_ro_')
+            
             seen = []
             for s in self.concatenations:
                 seen.append(s.name)
@@ -1284,6 +1300,13 @@ class Project:
                             not qualifiers_dictionary[meta] in OTU_list):
                             OTU_list.append(qualifiers_dictionary[meta])
                             
+            
+            if False: """This chunck checks for the presence of data
+            in the original records. It is therefore unaware of sequences
+            that were droped during alignment and trimming. It is now replaced by
+            the chunk below, checking for data availability in the trimmed alignments
+            instead.
+            
             # make lists of available feature_ids in each locus
             available_features = {}
             for locus in s.loci:
@@ -1353,9 +1376,11 @@ class Project:
                         elif len(locus_specific_features) > 1:
                             raise RuntimeError(individual + ' is not unique for ' + locus.name)
 
-            # build alignment
-            concat_records = []
-            alignment = []
+            """
+    
+            included_individuals = {} #included_individuals[otu][locus]=feautre_id
+            
+            #Get the correct trimmed alignment tokens
             keys_of_trimmed_alignments_to_use_in_concat = []
             for locus in s.loci:
                 trimmed_aln = None
@@ -1382,11 +1407,84 @@ class Project:
                 else:
                     raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
             
-            print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
+            #print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
             
-            if len(included_individuals.keys()) < 4:
-                raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
+            #if len(included_individuals.keys()) < 4:
+            #    raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
+            for otu in OTU_list:
+                otu_features = {}
+                use = True
+                
+                # Check first rule
+                for locus in s.concat_must_have_all_of:
+                    token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+                    feature_ids = [r.id for r in self.trimmed_alignments[token]]
+                    feature_found = False
+                    count = 0
+                    for feature_id in feature_ids:
+                        qualifiers = get_qualifiers_dictionary(self, feature_id)
+                        if meta in qualifiers.keys() and otu == qualifiers[meta]:
+                            count += 1
+                            feature_found = True
+                            otu_features[locus] = feature_id
+                    if count > 1:
+                        raise RuntimeError("%s is not unique in %s"%(otu, locus))
+                    if not feature_found:
+                        use = False
+                        
+                # Check second rule
+                if use:
+                    for group in s.concat_must_have_one_of:
+                        feature_found = False
+                        for locus in group:
+                            token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+                            feature_ids = [r.id for r in self.trimmed_alignments[token]]
+                            count = 0
+                            for feature_id in feature_ids:
+                                qualifiers = get_qualifiers_dictionary(self, feature_id)
+                                if meta in qualifiers.keys() and otu == qualifiers[meta]:
+                                    count += 1
+                                    feature_found = True
+                                    otu_features[locus] = feature_id
+                            if count > 1:
+                                raise RuntimeError("%s is not unique in %s"%(otu, locus))
+                        if not feature_found:
+                            use = False
+                if use:
+                    included_individuals[otu] = otu_features
             
+            # printing a table of the alignment
+            included_indivduals_table = ''
+            loci_names = [l.name for l in s.loci]
+            line = 'OTU'.ljust(30,' ')
+            for name in loci_names:
+                line += name.ljust(20,' ')
+            included_indivduals_table += line+'\n'
+            for otu in included_individuals.keys():
+                line = otu.ljust(30,' ')
+                for locus_name in loci_names:
+                    if locus_name in included_individuals[otu].keys():
+                        line += included_individuals[otu][locus_name].ljust(15,' ')
+                    else:
+                        line += ''.ljust(15,' ')
+                included_indivduals_table += line+'\n'
+            print "Concatenation %s wil have the following data"%s.name
+            print included_indivduals_table
+            
+            # remove partitions with less then 4 sequences
+            for name in loci_names:
+                if len([otu for otu in included_individuals.keys() if name in included_individuals[otu].keys()]) < 4:
+                    print (("Locus %s has less then 4 sequences in concatenation %s and where excluded "+
+                                         "from the concatenation")%(name,s.name))
+                    for key in keys_of_trimmed_alignments_to_use_in_concat:
+                        if name in key:
+                            keys_of_trimmed_alignments_to_use_in_concat.remove(key)
+                            
+                                        
+            
+            # build alignment
+            # concat_records = []
+            alignment = []
             for individual in included_individuals.keys():
                 sequence = ''
                 for key in keys_of_trimmed_alignments_to_use_in_concat:
@@ -1965,7 +2063,7 @@ class Project:
                         line = 'Alignment %s has less than 4 sequences and will be dropped'%(locus.name+'@'+method.method_name)
                         print line
                         summary += line+'\n'
-                    elif num_undeter > 0:
+                    elif num_undeter[0] > 0:
                         line = 'Alignment %s has undetermined sequences and will be dropped'%(locus.name+'@'+method.method_name)
                         print line
                         summary += line+'\n'
@@ -2492,10 +2590,16 @@ class Project:
                         line = 'Alignment %s has less than 4 sequences and will be dropped'%aln
                         print line
                         summary += line+'\n'
-                    elif num_undeter > 0:
-                        line = 'Alignment %s has undetermined sequences and will be dropped'%aln
+                    elif num_undeter[0] > 0:
+                        line = 'Alignment %s has undetermined sequences which will be dropped: %s'%(aln,num_undeter[1])
                         print line
                         summary += line+'\n'
+                        records_wo_undeter = []
+                        for record in align:
+                            if not record.id in num_undeter[1]:
+                                records_wo_undeter.append(record)
+                        align =  MultipleSeqAlignment(records_wo_undeter)
+                        self.trimmed_alignments[aln] = align
                     elif num_collapsed_aln_seqs < 4:
                         line = 'Alignment %s has less than 4 unique sequences and will be dropped'%aln
                         print line
@@ -2504,8 +2608,8 @@ class Project:
                         self.trimmed_alignments[aln] = align
                     self.aln_summaries.append(summary)
             for file_name in os.listdir(os.curdir):
-                        if m.id.partition('_')[0] in file_name:
-                            os.remove(file_name)
+                if m.id.partition('_')[0] in file_name:
+                    os.remove(file_name)
             m.timeit.append(time.time())
             m.timeit.append(m.timeit[2]-m.timeit[1])
             self.used_methods.append(m)
@@ -2679,11 +2783,14 @@ class AlnConf:
                     if locus_name == locus.name:
                         self.loci.append(locus)
         mutable_loci_list = []
+        removed_loci = []
         for locus in self.loci: 
             if len(pj.records_by_locus[locus.name]) < 4:
-                print "%s have less than 4 sequences and will be dropped from this conf object. Don't use it in a concatenation"%locus.name
+                removed_loci.append(locus.name)
+                #print "%s have less than 4 sequences and will be dropped from this conf object. Don't use it in a concatenation"%locus.name
             else:
                 mutable_loci_list.append(locus)
+        print "These loci have less than 4 sequences and will be dropped from this conf object. Don't use then in a concatenation:\n%s\n\n"%removed_loci
         self.loci = mutable_loci_list
         self.CDS_proteins = {}
         self.CDS_in_frame = {}
@@ -2906,20 +3013,21 @@ def make_raxml_partfile(tree_method, pj, trimmed_alignment_name):
             if locus.name == trm_aln.partition('@')[0]:
                 part_name = trm_aln
         if not part_name:
-            raise RuntimeError('There is no trimmed alignment for locus '+locus.name+' in concatenation '+concatenation.name)
-        part_length = concatenation.used_trimmed_alns[part_name]
-        if locus.char_type == 'prot':
-            m = None
-            if isinstance(tree_method.matrix,dict):
-                m = tree_method.matrix[locus.name]
-            elif isinstance(tree_method.matrix,str):
-                m = tree_method.matrix
-            else:
-                #todo write error
-                pass
-            model.append([m,part_name,part_length])
-        elif locus.char_type == 'dna':
-            model.append(['DNA',part_name,part_length])
+            warnings.warn('There is no trimmed alignment for locus '+locus.name+' in concatenation '+concatenation.name)
+        else:
+            part_length = concatenation.used_trimmed_alns[part_name]
+            if locus.char_type == 'prot':
+                m = None
+                if isinstance(tree_method.matrix,dict):
+                    m = tree_method.matrix[locus.name]
+                elif isinstance(tree_method.matrix,str):
+                    m = tree_method.matrix
+                else:
+                    #todo write error
+                    pass
+                model.append([m,part_name,part_length])
+            elif locus.char_type == 'dna':
+                model.append(['DNA',part_name,part_length])
                     
     # make partition file
                     
@@ -3089,19 +3197,14 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     import matplotlib.pyplot as plt
     items = dictionary.items()
     items.sort()
-    
     data = [locus[1] for locus in items]
-    boxwidth = 0.4
-    if len(data) > 15:
-        boxwidth = 0.2
-    elif len(data) > 30:
-        boxwidth = 0.1
         
     fig, ax1 = plt.subplots()
-    #plt.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
+    fig.set_size_inches(0.3*len(data),10)
+    plt.subplots_adjust(top=0.99, bottom=0.3)
 
     #bp = plt.boxplot(data, widths=0.75, patch_artist=True)
-    bp = plt.boxplot(data, widths=boxwidth, patch_artist=True)
+    bp = plt.boxplot(data, patch_artist=True)
     
     for box in bp['boxes']:
     # change outline color
@@ -3138,7 +3241,8 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     #ax1.set_title('Sequence length distribution per locus\n', size=18)
     
     xlabels = [locus[0] for locus in items]
-    xticks(range(len(data)+1)[1:], xlabels, size=14, rotation='vertical')
+    
+    xticks(range(1,len(data)+1), xlabels, size=14, rotation='vertical')
     #subplots_adjust(left=0.3, bottom=0.8)
     
     ax1.set_ylabel(y_axis_label, size=18)
@@ -3301,7 +3405,7 @@ def report_methods(pj, figs_folder, output_directory):
             if os.path.isfile(fig_filename):
                 #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
                 #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
-                img_tag = '<img height=400 src="%s">'%(fig_filename.partition('/')[-1])
+                img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
                 report_lines.append(img_tag)
                 #os.remove(fig_filename)
             
@@ -3338,7 +3442,7 @@ def report_methods(pj, figs_folder, output_directory):
                 # making an embeded image
                 if os.path.isfile(fig_filename):
                     #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img height=400 src="%s">'%(fig_filename.partition('/')[-1])
+                    img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
                     #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
                     report_lines.append(img_tag)
                     #os.remove(fig_filename)
@@ -3549,14 +3653,18 @@ def report_methods(pj, figs_folder, output_directory):
                               'ParsInf=Parsimony informative positions\n'+
                               'UnSeqs=Completely undetermined sequences (only gaps)\n</pre>')]
             T = [['Name','NumPos','NumSeq','Unique','GapProp','VarCols','ParsInf','UnSeqs']]
+            comments = []
             for summary in pj.aln_summaries:
                 line = []
                 for i in summary.splitlines():
-                    line.append(i.split(': ')[1])
+                    try:
+                        line.append(i.split(': ')[1])
+                    except:
+                        comments.append(i)
                 T.append(line)
             report_lines += ['',
                              HTML.table(T[1:], header_row=T[0]),
-                             '']
+                             '','<pre>']+comments+['</pre>']
         else:
             report_lines += ['','No sequence alignments in this Project','']
                 
