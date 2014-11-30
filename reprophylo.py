@@ -838,14 +838,14 @@ class Project:
         programspath = ''
         if str(callername) == 'make_project':
             programspath = "%s/galaxy-dist/tools/reprophylo/programs/"%os.environ['HOME']
-        self.defaults = {'raxmlHPC': path+'raxmlHPC-PTHREADS-SSE3',
+        self.defaults = {'raxmlHPC': programspath+'raxmlHPC-PTHREADS-SSE3',
                          'mafft': 'mafft',
-                         'muscle': path+'muscle',
-                         'trimal': path+'trimal',
-                         'pb': path+'pb',
-                         'bpcomp': path+'bpcomp',
-                         'tracecomp': path+'tracecomp',
-                         'pal2nal': path+'pal2nal.pl'}
+                         'muscle': programspath+'muscle',
+                         'trimal': programspath+'trimal',
+                         'pb': programspath+'pb',
+                         'bpcomp': programspath+'bpcomp',
+                         'tracecomp': programspath+'tracecomp',
+                         'pal2nal': programspath+'pal2nal.pl'}
         seen = []
         if isinstance(loci,list):
             for locus in loci:
@@ -2021,7 +2021,8 @@ class Project:
                 if method.program_name == 'muscle':
                     method.platform.append('Program and version: '+os.popen(method.cmd + ' -version').read())
                 elif method.program_name == 'mafft':
-                    method.platform.append('Program and version: Get mafft to spit version to stdout')
+                    p = sub.Popen(method.cmd+" --version", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
+                    method.platform.append('Program and version: '+p.communicate()[1].splitlines()[3])
                 for locus in method.loci:
                     if locus.name in seen_loci:
                         #raise RuntimeError('locus '+locus.name+' is in more than one AlnConf objects')
@@ -2916,15 +2917,15 @@ class AlnConf:
         date = str(self.timeit[0])
         execution = str(self.timeit[3])
         plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return ("AlnConf named %s with ID %s",         
-                "Loci: %s ",       
-                "Executed on: %s",
-                "Commands:",
-                "%s",
-                "Environment:",    
-                "%s",
-                "execution time:",
-                "%s" %(self.method_name, str(self.id), loci_string, date, command_lines, plat,execution))  
+        return str("AlnConf named %s with ID %s\n"+         
+                "Loci: %s \n"+       
+                "Executed on: %s\n"+
+                "Commands:\n"+
+                "%s\n"+
+                "Environment:\n"+    
+                "%s\n"+
+                "execution time:\n"+
+                "%s")%(self.method_name, str(self.id), loci_string, date, command_lines, plat, execution) 
 
 ##############################################################################################
 class TrimalConf:
@@ -2971,6 +2972,26 @@ class TrimalConf:
             print self.command_lines[aln+'@'+self.method_name]
             self.command_lines.pop(aln, None)
         
+    def __str__(self):
+        aln_string = ''
+        for n in self.alignments.keys():
+            aln_string += n+','
+        aln_string = aln_string[:-1]
+        command_lines = ''
+        for i in self.command_lines.keys():
+            command_lines += i+': '+str(self.command_lines[i])+'\n'
+        date = str(self.timeit[0])
+        execution = str(self.timeit[3])
+        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+        return str("TrimalConf named %s with ID %s\n"+         
+                "Alignments: %s \n"+       
+                "Executed on: %s\n"+
+                "Commands:\n"+
+                "%s\n"+
+                "Environment:"+    
+                "%s\n"+
+                "execution time:\n"+
+                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)  
 
 
 def use_sh_support_as_branch_support(tree_filename):
@@ -3196,6 +3217,26 @@ class RaxmlConf:
                 self.command_lines[trimmed_alignment].append(cline_object)
                 print str(cline_object)
 
+    def __str__(self):
+        aln_string = ''
+        for n in self.trimmed_alignments.keys():
+            aln_string += n+','
+        aln_string = aln_string[:-1]
+        command_lines = ''
+        for i in self.command_lines.keys():
+            command_lines += i+': '+str(self.command_lines[i])+'\n'
+        date = str(self.timeit[0])
+        execution = str(self.timeit[3])
+        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+        return str("RaxmlConf named %s with ID %s\n"+         
+                "Alignments: %s \n"+       
+                "Executed on: %s\n"+
+                "Commands:\n"+
+                "%s\n"+
+                "Environment:\n"+    
+                "%s\n"+
+                "execution time:\n"+
+                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)  
 
 
 from pylab import *
@@ -3557,12 +3598,10 @@ def report_methods(pj, figs_folder, output_directory):
         print "now reporting methods"
         for method in pj.used_methods:
             # This will print list representations of the 'Conf' objects
-            if isinstance(method,list) and(method[0] == 'AlnConf' or method[0] == 'RaxmlConf' or method[0] == 'TrimalConf'):
-                title = method[0]
+            if isinstance(method,str):
+                title = method.split('\n')[0]
                 report_lines += ('', '<h4>', title, '</h4>','')
-                for i in method[1:]:
-                    report_lines.append('<strong>'+str(i[0])+'</strong>')
-                    report_lines.append(str(i[1]).replace(',','<br>'))
+                report_lines += ('<pre>',method,'</pre>')
             
             # These will print attributes in actual 'Conf' objects 
             elif isinstance(method, AlnConf):
@@ -3842,35 +3881,10 @@ def unpickle_pj(pickle_file_name):
            setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
             
         for i in pkl_pj.used_methods:
-            if isinstance(i, list) and (i[0] == 'AlnConf' or i[0] == 'RaxmlConf' or i[0] == 'TrimalConf'):
+            if isinstance(i, str):
                 new_pj.used_methods.append(i)
             else:
-                
-                include = ['id',
-                           'method_name',
-                           'CDSAlign',
-                           'program_name',
-                           'loci',
-                           'alns'
-                           'command_lines',
-                           'timeit',
-                           'platform',
-                           'cmd',
-                           'preset',
-                           'model',
-                           'trimmed_alignments']
-            
-                method_list = []
-                if isinstance(i, AlnConf):
-                    method_list.append('AlnConf')
-                elif isinstance(i, RaxmlConf):
-                    method_list.append('RaxmlConf')
-                elif isinstance(i, TrimalConf):
-                    method_list.append('TrimalConf')
-                for attr in include:
-                    if attr in dir(i):
-                        method_list.append([attr, str(getattr(i,attr))])
-                new_pj.used_methods.append(method_list)
+                new_pj.used_methods.append(str(i))
         return new_pj
 
 def publish(pj, folder_name, figures_folder):
