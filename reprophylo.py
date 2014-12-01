@@ -835,6 +835,7 @@ class Project:
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe, 2)
         callername = calframe[1][3]
+        print callername
         programspath = ''
         if str(callername) == 'make_project':
             programspath = "%s/galaxy-dist/tools/reprophylo/programs/"%os.environ['HOME']
