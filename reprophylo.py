@@ -66,7 +66,7 @@ if False:
     """Tools for loci explorations in a GenBank File"""
 ##############################################################################################
 
-
+programspath = ""
 
 def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None):
     
@@ -831,14 +831,7 @@ class Project:
         self.used_methods = []
         self.sets = {}
         
-        # check if called by base_reprophylo
-        curframe = inspect.currentframe()
-        calframe = inspect.getouterframes(curframe, 2)
-        callername = calframe[1][3]
-        print callername
-        programspath = ''
-        if str(callername) == 'make_project':
-            programspath = "%s/galaxy-dist/tools/reprophylo/programs/"%os.environ['HOME']
+
         self.defaults = {'raxmlHPC': programspath+'raxmlHPC-PTHREADS-SSE3',
                          'mafft': 'mafft',
                          'muscle': programspath+'muscle',
@@ -847,6 +840,7 @@ class Project:
                          'bpcomp': programspath+'bpcomp',
                          'tracecomp': programspath+'tracecomp',
                          'pal2nal': programspath+'pal2nal.pl'}
+    
         seen = []
         if isinstance(loci,list):
             for locus in loci:
@@ -4000,9 +3994,6 @@ def draw_trimal_scc(pj, num_col, figs_folder, trimmed=False, alg = '-scc'):
     import random, os
     from Bio import AlignIO
     
-    programpath = ''
-    #programpath = "%s/galaxy-dist/tools/reprophylo/programs/"%os.environ['HOME']
-    
     # get the alignment objects
     #-------------------------#
     alignments = pj.alignments.items()
@@ -4031,15 +4022,8 @@ def draw_trimal_scc(pj, num_col, figs_folder, trimmed=False, alg = '-scc'):
         name = str(random.randint(1000,2000))+'_'+aln_name+'_for_trimal_graph.fasta'
         AlignIO.write(aln_obj, name, 'fasta')
         stderr = open('stderr','wt')
-        # check if called by base_reprophylo
-        curframe = inspect.currentframe()
-        calframe = inspect.getouterframes(curframe, 2)
-        callername = calframe[1][3]
-        programspath = ''
-        if str(callername) == 'make_project':
-            programspath = "%s/galaxy-dist/tools/reprophylo/programs/"%os.environ['HOME']
         #stdout = os.popen(programpath+'trimal '+alg+' -in '+name)#.read()
-        stdout = sub.Popen(programpath+"trimal "+alg+" -in " + name,
+        stdout = sub.Popen(programspath+"trimal "+alg+" -in " + name,
                        shell=True, stdout=sub.PIPE, stderr=stderr).stdout
         stderr.close()
         var = pd.read_table(stdout, sep='\t+', skiprows=3, engine='python')
@@ -4086,8 +4070,6 @@ def view_csv_as_table(csv_filename, delimiter, quotechar='|'):
                 string += row[i].ljust(field_sizes[i]+3)
             print string
             
-
-    
 
 if __name__ == "__main__":
     import doctest
