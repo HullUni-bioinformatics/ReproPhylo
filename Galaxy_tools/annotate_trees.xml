@@ -1,0 +1,158 @@
+
+<tool id="Annotate Trees" name="Annotate Trees"  version="0.1" hidden="false">
+    <description>
+    </description>
+    <command interpreter="python">
+        tree_annotation.py 
+        $projin $figsdir  -_ -a $altprojout 
+        #if str($root.howtoroot)=="other"
+        --rootmeta $root.rootqual --rootvalue $root.rootvalue
+        #end if
+        #if str($labeltext.howtolabel)=="other"
+        --leaflabelmeta $labeltext.leaflabelmeta
+        #end if        
+        #if str($labelcolor.howtocolorlabel)=="other"
+        --leafcolormeta $labelcolor.leafcolormeta --leafcolors $labelcolor.leafcolors
+        #end if
+        #if str($bgcolor.howtocolorbg)=="yes"
+        --nodebgmeta $bgcolor.nodebgmeta --nodebgcolors $bgcolor.nodebgcolors
+        #end if
+        #if str($nodeSupport.howtoshowsupport)=="no"
+        --nodesupport $nodeSupport.nodesupport
+        #end if 
+        #if str($heatmap.doheatmap)=="yes"
+        --heatmapmeta $heatmap.heatmapmeta --heatmapcolor $heatmap.heatmapcolor
+        #end if  
+        #if str($multifurc.collapse)=="yes"
+        --multifurc $multifurc.multifurccutoff 
+        #end if 
+        --treescale $treescale 
+        #if (str($whatreport)=="full")
+        -v report_arcive 
+        #end if
+        #if (str($whatreport)=="html")
+        --html figs.html 
+        #end if
+        > $log
+    </command>
+    <inputs>
+        <param name="projin" type="data" label="Input Project file" />
+        <param name="figsdir" type="text" label="Local path to keep figures" />
+        <param name="treescale" type="text" value="1000" label="Tree width" />
+        <conditional name="root">
+            <param name="howtoroot" type="select" label="How to root the tree?" >
+                <option value="mid">Root at midpoint</option>
+                <option value="other">Specify outgroup using metadata</option>
+            </param>
+            <when value="mid"/>
+            <when value="other">
+                <param name="rootqual" type="text" label="A metadata column name" />
+                <param name="rootvalue" type="text" label="The value to look for in this column" />
+            </when>
+        </conditional>
+        <conditional name="labeltext">
+            <param name="howtolabel" type="select" label="How to label leaves?" >
+                <option value="orng">Label leaves with the species name</option>
+                <option value="other">Specify labels using metadata</option>
+            </param>
+            <when value="orng"/>
+            <when value="other">
+                <param name="leaflabelmeta" type="text" label="A space delimited list of one or more metadata column name to use for labels" />
+            </when>
+        </conditional>
+        <conditional name="labelcolor">
+            <param name="howtocolorlabel" type="select" label="How to color labels?" >
+                <option value="black">Black</option>
+                <option value="other">According to rules</option>
+            </param>
+            <when value="black"/>
+            <when value="other">
+                <param name="leafcolormeta" type="text" label="A metadata column name to use for determining color" />
+                <param name="leafcolors" type="select" label="Select a color scheme" >
+                    <option value='contrast'>Contrast</option>
+                    <option value='reds'>Reds</option>
+                    <option value='greens'>Greens</option>
+                    <option value='blues'>Blues</option>
+                    <option value='purples'>Purples</option>
+                    <option value='browns'>Browns</option>
+                </param>
+            </when>
+        </conditional>
+        <conditional name="bgcolor">
+            <param name="howtocolorbg" type="select" label="Color node backgrounds?" >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+            </param>
+            <when value="no"/>
+            <when value="yes">
+                <param name="nodebgmeta" type="text" label="A metadata column name to use for determining bg color" />
+                <param name="nodebgcolors" type="select" label="Select a color scheme" >
+                    <option value='contrast'>Contrast</option>
+                    <option value='reds'>Reds</option>
+                    <option value='greens'>Greens</option>
+                    <option value='blues'>Blues</option>
+                    <option value='purples'>Purples</option>
+                    <option value='browns'>Browns</option>
+                </param>
+            </when>
+        </conditional>
+        <conditional name="nodeSupport">
+            <param name="howtoshowsupport" type="select" label="Use default ranges for node support annotations?" >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </param>
+            <when value="yes"/>
+            <when value="no">
+                <param name="nodesupport" type="text" label="A space delimited list of one or more trios of color, uppper and lower limit" />
+            </when>
+        </conditional>
+        <conditional name="heatmap">
+            <param name="doheatmap" type="select" label="make a heatmap?" >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+            </param>
+            <when value="no"/>
+            <when value="yes">
+                <param name="heatmapmeta" type="text" label="A list of metadata column names comprising the data vector" />
+                <param name="heatmapcolor" type="select" label="Select a color scheme" >
+                    <option value='0'>Green to blue</option>
+                    <option value='1'>Green to red</option>
+                    <option value='2'>Red to blue</option>
+                </param>
+            </when>
+        </conditional>
+        <conditional name="multifurc">
+            <param name="collapse" type="select" label="Collapse nodes?" >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+            </param>
+            <when value="no"/>
+            <when value="yes">
+                <param name="multifurccutoff" type="text" label="Node support cutoff for node collapsing" />
+            </when>
+        </conditional>
+        <param name="whatreport" type="select" label="Choose report type" >
+            <option value="html">HTML with links to figures</option>
+            <option value="full">Full report archive</option>
+        </param>          
+    </inputs>
+    <outputs>
+        <data name="log" format='txt' label="${tool.name} on ${on_string}: Log" />
+        <data name="altprojout" format='data' label="${tool.name} on ${on_string}: ReproPhylo Project" />
+        <data name="reportName" from_work_dir="report_arcive.zip" format="data" label="${tool.name} on ${on_string}: Report archive">
+            <filter>whatreport=="full"</filter>
+        </data>
+        <data name="htmlName" from_work_dir="figs.html" format="html" label="${tool.name} on ${on_string}: Figures html">
+            <filter>whatreport=="html"</filter>
+        </data>
+    </outputs>
+    <help>
+    
+ReproPhylo
+==========
+
+"Annotate Trees"
+----------------
+
+</help>
+</tool>    
