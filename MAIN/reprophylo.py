@@ -70,6 +70,16 @@ programspath = ""
 
 def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None):
     
+   """
+   Takes a genbank file, returns a loci csv file and a list of loci and their counts. The latter goes
+   either to stdout or to a file.
+    
+   >>> list_loci_in_genbank("test-data/test.gb", "test-data/temp_loci.csv", loci_report = "test-data/temp_loci.txt")
+   >>> assert open("test-data/temp_loci.csv",'r').read() == open("test-data/test_loci.csv",'r').read() 
+   >>> import os
+   >>> os.remove("test-data/temp_loci.csv")
+   """
+    
    stdout = sys.stdout
    if  loci_report: 
         sys.stdout = open(loci_report, 'w')
@@ -878,14 +888,14 @@ class Project:
         """
         Read a file from Genbank of EMBL
         
-        >>> input_filenames = ['data/example.gb']
+        >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
         >>> pj = Project([locus])
         >>> print(len(pj.records))
         0
         >>> pj.read_embl_genbank(input_filenames)
         >>> print(len(pj.records))
-        90
+        89
         """
         
         if __builtin__.git:
@@ -934,29 +944,31 @@ class Project:
         anaysis.
         
 
-        >>> input_filenames = ['data/example.gb']
+        >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> pj = project([locus])
+        >>> pj = Project([locus])
         >>> print(len(pj.records))
         0
         >>> pj.read_embl_genbank(input_filenames)
         >>> print(len(pj.records))
-        90
-        >>> input_filenames = ['data/example_denovo.fasta']
+        89
+        >>> input_filenames = ['test-data/test.fasta']
         >>> pj.read_denovo(input_filenames, 'dna')
+        1
         >>> print(len(pj.records))
-        91
+        90
         
         # Since the denovo sequence has no feature it is not included
         >>> pj.extract_by_locus()
         >>> print(len(pj.records_by_locus['coi']))
-        90
+        89
         
         # Making a feature for the denovo record.
         >>> pj.add_feature_to_record('denovo0', 'CDS',  qualifiers={'gene': 'coi'})
+        'denovo0_f0'
         >>> pj.extract_by_locus()
         >>> print(len(pj.records_by_locus['coi']))
-        91
+        90
         """
         
         if __builtin__.git:
@@ -1137,7 +1149,10 @@ class Project:
         1
         
         # adding a feature to a record in the pj
+        >>> import warnings
+        >>> warnings.simplefilter("ignore")
         >>> pj.add_feature_to_record('1', 'CDS', qualifiers={'gene': 'madeuplocus'})
+        '1_f0'
         >>> print(len(pj.records[0].features))
         2
         """
@@ -1665,7 +1680,7 @@ class Project:
         The following demonstartes all the feature qualifier editing methods
         
         # Make a dummy pj with a locus and with records
-        >>> input_filenames = ['data/example.gb']
+        >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
         >>> pj = Project([locus])
         >>> pj.read_embl_genbank(input_filenames)
@@ -1876,14 +1891,14 @@ class Project:
         
         """
         
-        >>> input_filenames = ['data/example.gb']
+        >>> input_filenames = ['test-data/test.gb']
         >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
         >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
         >>> pj = Project([coi, lsu])
         >>> pj.read_embl_genbank(input_filenames)
         >>> pj.extract_by_locus()
         >>> print(len(pj.records_by_locus['coi']))
-        90
+        89
         >>> print(len(pj.records_by_locus['28S']))
         48
         """
