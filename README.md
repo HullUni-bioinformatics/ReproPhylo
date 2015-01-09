@@ -1,6 +1,6 @@
 # ReproPhylo: Reproducible Phylogenetics
 
-ReproPhylo is a reproducible phylogenetics pipeline written in python and making use of BioPython and other open tools.
+ReproPhylo is a reproducible phylogenetics pipeline written in python and making use of BioPython and other open tools. The main webpage is here [http://hulluni-bioinformatics.github.io/ReproPhylo](http://hulluni-bioinformatics.github.io/ReproPhylo).
 
 ## Licence
 ReproPhylo is in the public domain under a [CC0 licence](http://creativecommons.org/publicdomain/zero/1.0/). This is a 'no copyright' licence and you are free to use, modify and repurpose any part of our work as you see fit. Note that some dependencies might have more constricting licences. See [manual](https://docs.google.com/document/d/1Q-8B0cvkZw2zMkuP0Af4zZ7FiAvBQPDdGbrLLMgtx_4/edit?usp=sharing) for list of dependencies. 
