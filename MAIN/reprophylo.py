@@ -1993,16 +1993,22 @@ class Project:
             else:
                 warnings.warn('Locus name %s not recognised'%key)
 
-    def filter_by_seq_length(self, min_length=0, max_length=None):
+    def filter_by_seq_length(self, locus_name, min_length=0, max_length=None):
         if self.records_by_locus == {}:
             self.extract_by_locus()
-        for key in self.records_by_locus.keys():
-            subset = [r for r in self.records_by_locus[key] if len(r) >= min_length]
-            if max_length:
-                subset = [r for r in subset if len(r) <= max_length]
-            self.records_by_locus[key] = subset
+        subset = [r for r in self.records_by_locus[locus_name] if len(r) >= min_length]
+        if max_length:
+            subset = [r for r in subset if len(r) <= max_length]
+        self.records_by_locus[locus_name] = subset
+        
+    def filter_by_gc_content(self, locus_name, min_percent_gc=0, max_percent_gc=None):
+        if self.records_by_locus == {}:
+            self.extract_by_locus()
+        subset = [r for r in self.records_by_locus[locus_name] if GC(r.seq) >= min_percent_gc]
+        if max_percent_gc:
+            subset = [r for r in subset if GC(r.seq) <= max_percent_gc]
+        self.records_by_locus[locus_name] = subset
                 
-
 
     def write_by_locus(self, format = 'fasta'):
         
@@ -2273,7 +2279,7 @@ class Project:
         webbrowser.open_new_tab(url)
         
     
-    def tree(self, raxml_methods, bpcomp='default'):
+    def tree(self, raxml_methods, bpcomp='default', bpcomp_burnin=0.2, bpcomp_step=10, bpcomp_cutoff=0.01):
         # to do: determine the program used and the resulting expected tree file name
         
         if bpcomp == 'default':
@@ -2281,19 +2287,46 @@ class Project:
         
         for raxml_method in raxml_methods:
             raxml_method.timeit.append(time.time())
-            raxml_method.platform = platform_report() 
-            raxml_method.platform.append('Program and version: '+ raxml_method.cmd + ': ' +
-                                         os.popen(raxml_method.cmd + ' -version').readlines()[2])
+            raxml_method.platform = platform_report()
+            if isinstance(raxml_method, RaxmlConf):
+                raxml_method.platform.append('Program and version: '+ raxml_method.cmd + ': ' +
+                                             os.popen(raxml_method.cmd + ' -version').readlines()[2])
+            elif isinstance(raxml_method, PbConf):
+                p = sub.Popen(raxml_method.cmd+" -v", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
+                raxml_method.platform.append('Program and version: '+p.communicate()[1].splitlines()[-1])
             for trimmed_alignment in raxml_method.command_lines.keys():
                 for cline in raxml_method.command_lines[trimmed_alignment]:
-                    stdout, stderr = cline()
+                    if isinstance(raxml_method, RaxmlConf):
+                        stdout, stderr = cline()
+                    elif isinstance(raxml_method, PbConf):
+                        sub.call(cline, shell=True)
                 t = None
-                if raxml_method.preset == 'fa':
-                    t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'0')
-                elif raxml_method.preset == 'fD_fb':
-                    t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'1')
-                elif raxml_method.preset == 'fd_b_fb':
-                    t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'2')
+                if isinstance(raxml_method, RaxmlConf):
+                    if raxml_method.preset == 'fa':
+                        t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'0')
+                    elif raxml_method.preset == 'fD_fb':
+                        t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'1')
+                    elif raxml_method.preset == 'fd_b_fb':
+                        t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'2')
+                elif isinstance(raxml_method, PbConf):
+                    base_name = "%s_%s"%(raxml_method.id, trimmed_alignment)
+                    trees_file = "%s.1.treelist"%base_name
+                    trees_per_chain = len(open(trees_file,'r').readlines())
+                    # find the number of chains
+                    nchains = raxml_method.cline_args['nchain'].split()[0]
+                    chain_names = ''
+                    for i in range(1,nchains+1):
+                        chain_names += "%s.%i "%(base_name, i)
+                    chain_names = chain_names[:-1]
+                    bpcomp_cline = "%s -c %f -x %i %i %s"%(bpcomp,
+                                                           bpcomp_cutoff,
+                                                           int(trees_per_chain*bpcomp_burnin),
+                                                           int(bpcomp_step),
+                                                           chain_names)
+                    sub.call(bpcomp_cline, shell=True)
+                    t = Tree("tracecomp.con.tre")
+                    for l in t:
+                        l.support = 0
                     
             
                 for n in t.traverse():
@@ -2350,9 +2383,10 @@ class Project:
                         self.trees[s.name+'@mixed@mixed@'+raxml_method.method_name] = [t,t.write(features=[])]
             raxml_method.timeit.append(time.time())
             raxml_method.timeit.append(raxml_method.timeit[2]-raxml_method.timeit[1])
-            for file_name in os.listdir(os.curdir):
-                        if raxml_method.id.partition('_')[0] in file_name:
-                            os.remove(file_name)
+            if not raxml_method.keepfiles:
+                for file_name in os.listdir(os.curdir):
+                            if raxml_method.id.partition('_')[0] in file_name:
+                                os.remove(file_name)
         self.used_methods += raxml_methods
 
 
@@ -2691,7 +2725,7 @@ class Project:
                            %token)
         elif len(keys) == 1:
             print "returning tree object %s"%keys[0]
-            return self.trees[keys[0]][0]    
+            return Tree(self.trees[keys[0]][1])
         
         
         
@@ -3122,20 +3156,20 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                 model = 'PROT'+tree_method.model+tree_method.matrix[trimmed_alignment_name]
         
     presets = {'fa': [{'-f': 'a',
-                           '-p': random.randint(0,999),
-                           '-x':  random.randint(0,999),
+                           '-p': random.randint(99,999),
+                           '-x':  random.randint(99,999),
                            '-s': input_filename,
                            '-N': support_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
                            '-m': model}
                       ],
                 'fD_fb':[{'-f': 'D',
-                          '-p': random.randint(0,999),
+                          '-p': random.randint(99,999),
                           '-s': input_filename,
                           '-N': ML_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
                            '-m': model},{'-f': 'b',
-                                                       '-p': random.randint(0,999),
+                                                       '-p': random.randint(99,999),
                                                        '-s': input_filename,
                                                        '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
                                                        '-m': model,
@@ -3143,20 +3177,20 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                                                        '-z': 'RAxML_rellBootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'0'}
                          ],
                 'fd_b_fb':[{'-f': 'd',
-                          '-p': random.randint(0,999),
+                          '-p': random.randint(99,999),
                           '-s': input_filename,
                           '-N': ML_replicates,
                            '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
                            '-m': model},{
-                                                       '-p': random.randint(0,999),
-                                                       '-b': random.randint(0,999),
+                                                       '-p': random.randint(99,999),
+                                                       '-b': random.randint(99,999),
                                                        '-s': input_filename,
                                                        '-#': support_replicates,
                                                        '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
                                                        '-m': model,
                                                        '-T': tree_method.threads},
                                                        {'-f': 'b',
-                                                       '-p': random.randint(0,999),
+                                                       '-p': random.randint(99,999),
                                                        '-s': input_filename,
                                                        '-n': tree_method.id+'_'+trimmed_alignment_name+'2',
                                                        '-m': model,
@@ -3187,7 +3221,7 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
 class RaxmlConf:
 ##############################################################################################
     
-    def __init__(self, pj, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3',
+    def __init__(self, pj, method_name='fa', program_name='raxmlHPC-PTHREADS-SSE3', keepfiles=False,
                  cmd='default', preset = 'fa', alns='all', model='GAMMA', matrix='JTT', threads=4,
                  cline_args={}):
         
@@ -3214,6 +3248,7 @@ class RaxmlConf:
         self.timeit = [time.asctime()]
         self.platform = []
         self.cmd = cmd
+        self.keepfiles = keepfiles
         if cmd == 'default':
             self.cmd = pj.defaults['raxmlHPC']
         
@@ -3248,7 +3283,54 @@ class RaxmlConf:
                 "execution time:\n"+
                 "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)  
 
+def make_pb_input_matrix_file(conf_obj, trimmed_alignment_name):
+    SeqIO.write(conf_obj.trimmed_alignments[trimmed_alignment_name],
+                conf_obj.id+'_'+trimmed_alignment_name+'.phylip','phylip-relaxed')
+    return conf_obj.id+'_'+trimmed_alignment_name+'.phylip'
 
+
+def write_pb_cline(conf_obj, pj, trimmed_alignment):
+    cline = "%s -d %s"%(conf_obj.cmd, make_pb_input_matrix_file(conf_obj, trimmed_alignment))
+    for key in conf_obj.cline_args:
+        kw = key
+        if key[0] == '-':
+            kw = key[1:]
+        cline += " -%s"%str(kw)
+        if not str(conf_obj.cline_args[key]) == str(True):
+            cline += " %s"%str(conf_obj.cline_args[key]) 
+    cline += " %s_%s"%(conf_obj.id, trimmed_alignment)
+    return cline
+            
+
+class PbConf:
+    
+    def __init__(self, pj, method_name = 'dna_cat_gtr', program_name='phylobayes', keepfiles=True,
+                 cmd='default', alns='all', cline_args=dict(nchain="2 100 0.1 100",
+                                                            gtr=True,
+                                                            cat=True)):
+        self.id = str(random.randint(10000,99999))+str(time.time())
+        self.method_name=method_name
+        self.program_name=program_name
+        self.cline_args = cline_args
+        self.trimmed_alignments = pj.trimmed_alignments
+        if not alns == 'all':
+            self.trimmed_alignments = {}
+            for aln_name in alns:
+                if aln_name in pj.trimmed_alignments.keys():
+                    self.trimmed_alignments[aln_name] = pj.trimmed_alignments[aln_name]
+        self.aln_input_strings = {}
+        self.command_lines = {}
+        self.timeit = [time.asctime()]
+        self.platform = []
+        self.cmd = cmd
+        self.keepfiles = keepfiles
+        if cmd == 'default':
+            self.cmd = pj.defaults['pb']
+        
+        for trimmed_alignment in self.trimmed_alignments.keys():
+            self.command_lines[trimmed_alignment] = [write_pb_cline(self, pj, trimmed_alignment)]
+            print self.command_lines[trimmed_alignment][0]
+            
 from pylab import *
 import random
 
@@ -4084,7 +4166,360 @@ def view_csv_as_table(csv_filename, delimiter, quotechar='|'):
             for i in range(len(row)):
                 string += row[i].ljust(field_sizes[i]+3)
             print string
+
+def rfmt_tree_for_and_char_matirx_bayestraits(pj, qual_list, rootmeta, rootvalue, treefile=None, 
+                              treetoken=None, treeburnin=0, treestep=1, treeformat=5):
+    if treefile and treetoken:
+        raise IOError("Only specify treefile ot treetoken, not both")
+    T = None
+    if treefile:
+        T = open(treefile,'r').readlines()
+        T = T[:-1]
+    elif treetoken:
+        T = [pj.ft(treetoken).write()]
+    else:
+        raise IOError("Specify treefile or treetoken")
+    
+    leaf_names = Tree(T[0].rstrip(), format=treeformat).get_leaf_names()
+    
+    translate = []
+    i = 1
+    for n in leaf_names:
+        translate.append([n,str(i)])
+        i +=1 
+    
+    char_matrix = ""
+    for n in leaf_names:
+        line = "%s "%n
+        quals = get_qualifiers_dictionary(pj, n)
+        for qual in qual_list:
+            if qual in quals.keys():
+                line += "%s "%str(quals[qual])
+            else:
+                line += "- "
+        line = line[:-1]+'\n'
+        char_matrix += line
             
+    reformatted_tree = """#NEXUS
+    Begin Trees;
+        TRANSLATE
+    """
+    for t in translate[:-1]:
+        reformatted_tree += '\t\t'+t[1]+'\t'+t[0]+',\n'
+    reformatted_tree += '\t\t'+translate[-1][1]+'\t'+translate[-1][0]+';\n'
+    
+    for i in range(int(len(T)*treeburnin),len(T),treestep):
+        j = T[i]
+        newick = Tree(j.rstrip(), format=treeformat)
+        brlns = []
+        for n in newick.traverse():
+            brlns.append(n.dist)
+        if sorted(brlns)[2] == 0.0: # three 0 length branches - too much
+            pass
+        else:
+            R = None
+            count = 0
+            for l in newick:
+                if get_qualifiers_dictionary(pj, l.name)[rootmeta] == rootvalue:
+                    R = l.name
+                    count += 1
+            if not count == 1:
+                raise RuntimeError("%s does not exist or not unique in qualifier %s"%(rootvalue, rootmeta))
+            newick.set_outgroup(newick&R)
+            newick_str = newick.write(format=5)
+            for t in translate:
+                newick_str = re.sub(t[0],t[1],newick_str)
+            reformatted_tree += 'Tree tree'+str(i)+'= '+newick_str+'\n'
+    reformatted_tree += 'End;\n'
+    
+    return reformatted_tree, char_matrix
+    
+# Exonerate
+
+def bayestraits(pj, qual_list, rootmeta, rootvalue,
+                    treefile=None, treetoken=None,
+                    treeburnin=0, treestep=1,
+                    treeformat=5,
+                    bayestraits = 'BayesTraits',
+                    commands = [4,1,'kappa','delta','lambda','run']):
+    # make command file
+    import random
+    rand = random.randint(1000000,9999999)
+    cfile = open(str(rand),'wt')
+    for i in commands:
+        cfile.write(str(i)+'\n')
+    cfile.close()
+    reformatted_tree, char_matrix = rfmt_tree_for_and_char_matirx_bayestraits(pj, qual_list, rootmeta, rootvalue, treefile=treefile, 
+                                                                              treetoken=treetoken, treeburnin=treeburnin, treestep=treestep,
+                                                                              treeformat=treeformat)
+    
+    tfile = open(str(rand)+'.nex','wt')
+    tfile.write(reformatted_tree)
+    tfile.close()
+    
+    mfile = open(str(rand)+'.txt','wt')
+    mfile.write(char_matrix)
+    mfile.close()
+    
+    cline = "%s %s %s < %s" %(bayestraits, str(rand)+'.nex', str(rand)+'.txt', str(rand))
+    import os
+    stdout = os.popen(cline).read()
+    os.remove(str(rand))
+    os.remove(str(rand)+'.nex')
+    os.remove(str(rand)+'.txt')
+    return stdout
+
+
+# Exonerate
+
+
+
+class ExonerateCommandLine:
+    
+    """cline object with execute methods"""
+        
+    def __init__(self,
+                 q, #query filename
+                 t, #target filename
+                 path='exonerate',
+                 Q="unknown",# query alphabet
+                 T="unknown", # target alphabet
+                 querychunkid=0, #query job number
+                 targetchunkid=0, #target job number
+                 querychunktotal=0, #Num of queries
+                 targetchunktotal=0, #Num of targets
+                 E="FALSE", #exhaustive search
+                 B="FALSE", #rapid comparison between long seqs
+                 forcescan="none", #Force FSM scan on query or target sequences q or t
+                 saturatethreshold=0, #word saturation threshold
+                 customserver="NULL", # Custom command to send non-standard server
+                 fastasuffix=".fa", #Fasta file suffix filter (in subdirectories)
+                 m="ungapped",
+                 s=100, #Score threshold for gapped alignment
+                 percent=0.0, #Percent self-score threshold
+                 showalignment="TRUE",
+                 showsugar="FALSE",
+                 showcigar="FALSE",
+                 showvulgar="FALSE",
+                 showquerygff="FALSE", # Include GFF output on query in results
+                 showtargetgff="FALSE", #Include GFF output on target in results
+                 ryo="NULL", #Roll-your-own printf-esque output format
+                 n=0, #Report best N results per query
+                 S="TRUE", #Search for suboptimal alignments
+                 g="TRUE", #Use gapped extension
+                 refine="none", #none|full|region
+                 refineboundary=32, #Refinement region boundary
+                 D=32, #Maximum memory to use for DP tracebacks (Mb)
+                 C="TRUE", #Use compiled viterbi implementations
+                 terminalrangeint=12, #Internal terminal range
+                 terminalrangeext=12, #External terminal range
+                 joinrangeint=12, #Internal join range
+                 joinrangeext=12, #External join range
+                 x=50, #Gapped extension threshold
+                 singlepass="TRUE", #Generate suboptimal alignment in a single pass
+                 joinfilter=0, #BSDP join filter threshold
+                 A="none", #Path to sequence annotation file
+                 softmaskquery="FALSE", #Allow softmasking on the query sequence
+                 softmasktarget="FALSE", #Allow softmasking on the target sequence
+                 d="nucleic", #DNA substitution matrix
+                 p="blosum62", #Protein substitution matrix
+                 M=64, #Memory limit for FSM scanning <Mb>
+                 forcefsm="none", #Force FSM type ( normal | compact )
+                 wordjump=1, #Jump between query words
+                 o=-12, #Affine gap open penalty
+                 e=-4, #Affine gap extend penalty
+                 codongapopen=-18, #Codon affine gap open penalty
+                 codongapextend=-8, #Codon affine gap extend penalty
+                 minner=10, #Minimum NER length
+                 maxner=50000, #Maximum NER length
+                 neropen=-20, #NER open penalty
+                 minintron=30, #Minimum intron length
+                 maxintron=20000, #Maximum intron length
+                 i=-30, #Intron Opening penalty
+                 f=-28, #Frameshift creation penalty
+                 useaatla="TRUE", #useaatla
+                 geneticcode=1, #Use built-in or custom genetic code
+                 hspfilter=0, #Aggressive HSP filtering level
+                 useworddropoff="TRUE", #Use word neighbourhood dropoff
+                 seedrepeat=1, #Seeds per diagonal required for HSP seeding
+                 dnawordlen=12, #Wordlength for DNA words
+                 proteinwordlen=6, #Wordlength for protein words
+                 codonwordlen=12, #Wordlength for codon words
+                 dnahspdropoff=30, #DNA HSP dropoff score
+                 proteinhspdropoff=20, #Protein HSP dropoff score
+                 codonhspdropoff=40, #Codon HSP dropoff score
+                 dnahspthreshold=75, #DNA HSP threshold score
+                 proteinhspthreshold=30, #Protein HSP threshold score
+                 codonhspthreshold=50, #Codon HSP threshold score
+                 dnawordlimit=0, #Score limit for dna word neighbourhood
+                 proteinwordlimit=4, #Score limit for protein word neighbourhood
+                 codonwordlimit=4, #Score limit for codon word neighbourhood
+                 geneseed=0, #Geneseed Threshold
+                 geneseedrepeat=3, #Seeds per diagonal required for geneseed HSP seeding
+                 alignmentwidth=80, #Alignment display width
+                 forwardcoordinates="TRUE", #Report all coordinates on the forward strand
+                 quality=0, #HSP quality threshold
+                 splice3="primate", #Supply frequency matrix for 3' splice sites
+                 splice5="primate", #Supply frequency matrix for 5' splice sites
+                 forcegtag="FALSE"): #Force use of gt...ag splice sites
+        
+        import inspect
+
+        frame = inspect.currentframe()
+        args, _, _, values = inspect.getargvalues(frame)
+
+        cline = values['path']+' '
+        
+        for k in ('path','frame','inspect', 'self'):
+            del values[k] 
+        
+        for keyward in values:
+            
+            dash = '-'
+            if len(keyward) > 1:
+                 dash = '--'
+            cline += dash+keyward+' '+str(values[keyward])+' '
+        self.cline_string = cline
+        self.stdout = None
+
+    def __str__(self):
+        return self.cline_string
+    
+    def execute(self):
+        import subprocess as sub
+        p = sub.Popen(self.cline_string, shell=True, stdout=sub.PIPE, stderr=sub.PIPE)
+        self.stdout = p.communicate()[0]
+        return self.stdout
+
+# an all inclusive exonerate ryo format 
+
+roll = ("STARTRYOqfull = %qas @!!@!!@ qcds = %qcs @!!@!!@ qid = %qi @!!@!!@ qdescription = %qd @!!@!!@ "+
+       "qlen = %qal @!!@!!@ qstrand = %qS @!!@!!@ qtype = %qt @!!@!!@ qbegin = %qab @!!@!!@ qend = %qae @!!@!!@ "+
+       "tfull = %tas @!!@!!@ tcds = %tcs @!!@!!@ tid = %ti @!!@!!@ tdescription = %td @!!@!!@ "+
+       "tlen = %tal @!!@!!@ tstrand = %tS @!!@!!@ ttype = %tt @!!@!!@ tbegin = %tab @!!@!!@ tend = %tae @!!@!!@ "+
+       "Etotal = %et @!!@!!@ Eident = %ei @!!@!!@ Esim = %es @!!@!!@ Emis = %em @!!@!!@ Pident = %pi @!!@!!@ "+
+       "Psim = %ps @!!@!!@ score = %s @!!@!!@ model = %m @!!@!!@ vulgar = %VENDRYO")
+
+def parse_ryo(exo_results):
+    
+    """parses exonerate results that include the ryo line above"""
+    
+    stats = []
+    ryos = [i.split("ENDRYO")[0] for i in exo_results.split('STARTRYO')[1:]][1:]
+    if len(ryos) > 0:
+        for i in ryos:
+            a = {}
+            for line in i.split('@!!@!!@'):
+                k, v = [line.partition('=')[0], line.partition('=')[2]]
+                a[k.strip().rstrip()] = v.strip().rstrip()
+            stats.append(a)
+            a['qfull'] = a['qfull'].replace('\n','').replace("\s",'')
+            a['qcds'] = a['qcds'].replace('\n','').replace("\s",'')
+            a['tfull'] = a['tfull'].replace('\n','').replace("\s",'')
+            a['tcds'] = a['tcds'].replace('\n','').replace("\s",'')
+            
+    return stats
+
+def exonerate(q, d, **kwargs):
+    
+    """Will run exonerate with the ryo format above.
+    Returns a dictionary with the ryo line content and the raw output as string"""
+    
+    if 'ryo' in kwargs.keys():
+        kwargs.pop('ryo', None)
+    results = ''
+    exoCline = ExonerateCommandLine(q, d, ryo="\"%s\""%roll, **kwargs)
+    results = exoCline.execute()
+    #print results
+    stats = parse_ryo(results)
+    #print stats
+    return stats, results
+
+
+def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
+    
+    """takes the parsed ryo (stats) and the raw output (results) and
+    builds a gb file for reprophylo"""
+    
+    if get_query:
+        raise RuntimeError('get_query=True: currently only parses target. maybe Bio.SearchIO can help?')
+    
+    gencode = int(results.split('geneticcode ')[1].split()[0])
+    model = results.split('model ')[1].split()[0]
+    if not model == 'protein2genom':
+        warnings.warn("only tested with the protein2genome model")
+    #gencode = '1'
+    tfile = d
+    if '/' in d:
+        tfile = d.split('/')[-1]
+    matches = stats
+    b = 0
+    records = []
+    for match in matches:
+        ID = "%s|%s|%i"%(tfile[:4],tfile[-4:],b)
+        
+        r = SeqRecord(seq=Seq(match['tfull'],
+                              alphabet=IUPAC.unambiguous_dna),
+                      id = ID,
+                      description = "query: %s %s, target: %s %s, HSPID: %i"%(match['qid'],
+                                                                              match['qdescription'],
+                                                                              match['tid'],
+                                                                              match['tdescription'],
+                                                                              b))
+        b += 1
+        source = SeqFeature(FeatureLocation(0, len(r.seq)), type='source')
+        source.qualifiers['file'] = [tfile]
+        for key in match:
+            source.qualifiers[key] = [match[key]]
+        r.features.append(source)
+        vulgar = match['vulgar'].split()
+        features = [vulgar[i:i+3] for i in range(0, len(vulgar) - 2, 3)]
+        pos = 0
+        CDS = None
+        for feature in features:
+            ftype = feature[0]
+            flength = int(feature[2])
+            f = SeqFeature(FeatureLocation(pos, pos+flength), type = ftype)
+            f.qualifiers['gene'] = [match['qid']]
+            pos += flength
+            r.features.append(f)
+        coding_locations = []
+        for j in r.features:
+            if j.type == 'M' or j.type == 'S':
+                coding_locations.append(j.location)
+            elif j.type == 'G' and (int(j.location.start) < int(j.location.end)):
+                coding_locations.append(j.location)
+        coding_locations = sorted(coding_locations, key = lambda l: int(l.start))
+        if len(coding_locations) == 1:
+            CDS = SeqFeature(coding_locations[0], type='CDS')
+        else:
+            CDS = SeqFeature(CompoundLocation(coding_locations), type='CDS')
+        CDS.qualifiers['gene'] = [match['qid']]
+        get = False
+        try:
+            CDS.qualifiers['translations'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
+            assert CDS.qualifiers['translations'][0] == str(Seq(match['tcds'].replace(' ',''),
+                                                                alphabet=IUPAC.ambiguous_dna).translate()).replace('*','X')
+            get = True
+        except:
+            CDS.qualifiers['translations'] = ['something went wrong']
+            print "DEBUG bad CDS"
+            print match['tid']
+            #print len(CDS.extract(r.seq)), len(match['tcds'].replace(' ',''))
+            #print str(CDS.extract(r.seq))[:20], str(CDS.extract(r.seq))[-20:]
+            #print match['tcds'].replace(' ','')[:20], match['tcds'].replace(' ','')[-20:]
+            print (str(CDS.extract(r.seq)) == match['tcds'].replace(' ',''))
+            if (str(CDS.extract(r.seq)) == match['tcds'].replace(' ','')):
+                print 'CDS retrieved correctly buy biopython could not translate'
+            else:
+                print 'Error in retrieved CDS (CDS built form vulgar does not match the CDS from ryo \%tcs'
+            #print str(CDS.extract(r.seq))
+        if get:
+            r.features.append(CDS)
+            records.append(r)
+    a = SeqIO.write(records,'%s.gb'%d,'genbank')
+    return "%i in %s.gb"%(a, d)
+
 
 if __name__ == "__main__":
     import doctest
