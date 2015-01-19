@@ -14,5 +14,5 @@ We welcome your additions and improvements, just fork the repository on GitHub a
 ## Sources
 1. This repository - active development of the python module and Galaxy tools as well as tutorials.
 2. [The Dockerfile repository](https://github.com/HullUni-bioinformatics/ReproPhyloDockerfile) - contains the Dockerfile with its dependecies. You can use [Docker](https://www.docker.com/) to build a Docker image locally using this reporitory.
-3. [The Galaxy distribution repository](https://github.com/HullUni-bioinformatics/ReproPhyloGalaxy) - A Galaxy distriution including the Galaxy ReproPhylo tools, their dependencies and in INSTALL file.
+3. [The Galaxy distribution repository](https://github.com/HullUni-bioinformatics/ReproPhyloGalaxy) - A Galaxy distriution including the Galaxy ReproPhylo tools, their dependencies and an INSTALL file.
 4. [The DockerHub reporitory](https://registry.hub.docker.com/u/szitenberg/reprophylo/) - A [Docker](https://www.docker.com/) image of the python module in an [IPython notebook](http://ipython.org/notebook.html) environment.
