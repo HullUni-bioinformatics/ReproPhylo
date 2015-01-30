@@ -276,6 +276,8 @@ class Concatenation:
         self.otu_meta = otu_meta
         self.concat_must_have_all_of = concat_must_have_all_of
         self.concat_must_have_one_of = concat_must_have_one_of
+        if isinstance(concat_must_have_one_of[0],str):
+            raise IOError('The keyword \'concat_must_have_one_of\' has to be a list of lists')
         self.feature_id_dict = {}
         self.define_trimmed_alns = define_trimmed_alns
         self.used_trimmed_alns = {}
@@ -849,6 +851,7 @@ class Project:
                          'pb': programspath+'pb',
                          'bpcomp': programspath+'bpcomp',
                          'tracecomp': programspath+'tracecomp',
+                         'fasttree': programspath+'FastTreeMP',
                          'pal2nal': programspath+'pal2nal.pl'}
     
         seen = []
@@ -1321,7 +1324,7 @@ class Project:
             
             if False: """This chunck checks for the presence of data
             in the original records. It is therefore unaware of sequences
-            that were droped during alignment and trimming. It is now replaced by
+            that were droped during alignment, trimming and filtering. It is now replaced by
             the chunk below, checking for data availability in the trimmed alignments
             instead.
             
@@ -1415,11 +1418,11 @@ class Project:
                     for definition in s.define_trimmed_alns:
                         if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
                             trimmed_aln = definition
-                        elif definition.count('@') == 1 and bool(any(definition in i for i in all_locus_trimmed_alns_in_pj)):
+                        elif definition.count('@') == 1 and any([definition in i for i in all_locus_trimmed_alns_in_pj]):
                             trimmed_aln = locus.name+'@'+definition
                         else:
                             raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
-                                                locus.name+"' out of "+str(locus_trimmed_alns))
+                                                locus.name+"' out of "+str(all_locus_trimmed_alns_in_pj))
                 if trimmed_aln:
                     keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
                 else:
@@ -1453,6 +1456,8 @@ class Project:
                 # Check second rule
                 if use:
                     for group in s.concat_must_have_one_of:
+                        if isinstance(group,str):
+                            raise IOError('The keyword \'concat_must_have_one_of\' has to be a list of lists')
                         feature_found = False
                         for locus in group:
                             token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
@@ -1486,7 +1491,7 @@ class Project:
                     else:
                         line += ''.ljust(15,' ')
                 included_indivduals_table += line+'\n'
-            print "Concatenation %s wil have the following data"%s.name
+            print "Concatenation %s will have the following data"%s.name
             print included_indivduals_table
             
             # remove partitions with less then 4 sequences
@@ -1514,7 +1519,7 @@ class Project:
                             if record.id == included_individuals[individual][locus_name]:
                                 sequence += str(record.seq)
                     else:
-                        sequence += 'N'*length
+                        sequence += '?'*length
                 concat_sequence = SeqRecord(seq = Seq(sequence), id = individual, description = '')
                 alignment.append(concat_sequence)
             self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
@@ -1562,7 +1567,7 @@ class Project:
             
             with open(filename, 'wb') as csvfile:
                 linewriter = csv.writer(csvfile, delimiter='\t',
-                                        quotechar='|',
+                                        quotechar='"',
                                         quoting=csv.QUOTE_MINIMAL)
                 linewriter.writerow(['record_id','seq']+['source:_'+q for q in source_qualifiers]+['taxonomy']+feature_qualifiers)
                 for record in self.records:
@@ -2074,7 +2079,7 @@ class Project:
                         aln_filename = method.id+'_'+locus.name+'.aln'
                         AlignIO.write(align, aln_filename, 'fasta')
                         cds_filename = method.id+'_CDS_in_frame_'+locus.name+'.fasta'
-                        stdout = os.popen(pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr').read()
+                        stdout = os.popen(pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr -codontable %i'%method.codontable).read()
                         align = AlignIO.read(StringIO(stdout), "clustal",  alphabet=IUPAC.ambiguous_dna)
                         #from Bio import CodonAlign
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
@@ -2490,10 +2495,10 @@ class Project:
                 ts.legend_position=1
                 ts.legend.add_face(TextFace('Node support: ', fsize=10), column=0)
                 i = 1
-                for color in node_support_dict.keys():
-                    ts.legend.add_face(CircleFace(radius = 4, color = color), column=i)
+                for color in sorted(node_support_dict.items(),key=lambda i: i[1][0], reverse=True):
+                    ts.legend.add_face(CircleFace(radius = 4, color = color[0]), column=i)
                     i +=1 
-                    ts.legend.add_face(TextFace(' '+str(node_support_dict[color][0])+'-'+str(node_support_dict[color][1]),
+                    ts.legend.add_face(TextFace(' '+str(node_support_dict[color[0]][0])+'-'+str(node_support_dict[color[0]][1]),
                                                 fsize=10), column=i)
                     i += 1
                 
@@ -2577,6 +2582,13 @@ class Project:
                 # ladderize
                 self.trees[tree][0].ladderize()
             
+                ns = NodeStyle()
+                ns['size'] = 0
+                ns['fgcolor'] = 'black'
+                for n in self.trees[tree][0].traverse():
+                    n.set_style(ns)
+                self.trees[tree][0].set_style(ns)
+            
                 if multifurc:
                     for n in self.trees[tree][0].traverse():
                         if n.support < multifurc and not n.is_leaf():
@@ -2587,7 +2599,10 @@ class Project:
                     for key in node_bg_color.keys():
                         for node in self.trees[tree][0].get_monophyletic(values=[key], target_attr=node_bg_meta):
                             ns = NodeStyle(bgcolor=node_bg_color[key])
+                            ns['size']=0
+                            ns['fgcolor']='black'
                             node.set_style(ns)
+                
     
                 # node support
                 if node_support_dict:
@@ -2684,7 +2699,7 @@ class Project:
             draw_boxplot(lengths_dict, 'Seq length (bp)', 'inline')
             
             
-            for stat in ('GC_content', 'nuc_degen_prop', 'prot_degen_prop'):
+            for stat in ['GC_content']:#, 'nuc_degen_prop', 'prot_degen_prop'):
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
                 print title.title()
                 # This will make a dict with loci as keys and a list of stat values as
@@ -2821,7 +2836,7 @@ class AlnConf:
     #                                     cline_args=dict())
     """
     
-    def __init__(self, pj, method_name='mafftDefault', CDSAlign=True, program_name='mafft',
+    def __init__(self, pj, method_name='mafftDefault', CDSAlign=True, codontable=1, program_name='mafft',
                  cmd='mafft', loci='all',
                  cline_args=dict()):
         self.id = str(random.randint(10000,99999))+str(time.time())
@@ -2848,10 +2863,12 @@ class AlnConf:
         self.loci = mutable_loci_list
         self.CDS_proteins = {}
         self.CDS_in_frame = {}
+        self.codontable = codontable 
         self.aln_input_strings = {}
         self.command_lines = {}
         self.timeit = [time.asctime()]
         self.platform = []
+        self.cline_args = cline_args
         self.cmd = cmd
         if not program_name == 'mafft' and cmd == 'mafft':
             self.cmd = pj.defaults[program_name]
@@ -2875,7 +2892,8 @@ class AlnConf:
                 for record in pj.records:
                     for feature in record.features:
                         if (feature.type == 'CDS' and 'gene' in feature.qualifiers.keys() and
-                            feature.qualifiers['gene'][0] in locus.aliases):
+                            feature.qualifiers['gene'][0] in locus.aliases and 
+                            feature.qualifiers['feature_id'][0] in [f.id for f in pj.records_by_locus[locus.name]]):
                             S = feature.extract(record.seq)
                             # Make in-frame CDS input file seq start in frame
                             if 'codon_start' in feature.qualifiers.keys():
@@ -2991,6 +3009,7 @@ class TrimalConf:
         self.command_lines = {}
         self.timeit = [time.asctime()]
         self.platform = []
+        self.cline_args = trimal_commands
         self.cmd = cmd
         if cmd == 'default':
             self.cmd = pj.defaults['trimal']
@@ -3330,6 +3349,10 @@ class PbConf:
         for trimmed_alignment in self.trimmed_alignments.keys():
             self.command_lines[trimmed_alignment] = [write_pb_cline(self, pj, trimmed_alignment)]
             print self.command_lines[trimmed_alignment][0]
+            
+#class FastTreeConf:
+    
+
             
 from pylab import *
 import random
@@ -3940,44 +3963,44 @@ def report_methods(pj, figs_folder, output_directory):
     
         
 def pickle_pj(pj, pickle_file_name):
-        import os
-        if os.path.exists(pickle_file_name):
-            os.remove(pickle_file_name)
-        import cloud.serialization.cloudpickle as pickle
-        output = open(pickle_file_name,'wb')
-        pickle.dump(pj, output)
-        output.close()
-        if __builtin__.git:
-            import rpgit
-            rpgit.gitAdd(pickle_file_name)
-            comment = "A pickled Project from %s" % time.asctime()
-            rpgit.gitCommit(comment) 
-            
-        return pickle_file_name
+    import os
+    if os.path.exists(pickle_file_name):
+        os.remove(pickle_file_name)
+    import cloud.serialization.cloudpickle as pickle
+    output = open(pickle_file_name,'wb')
+    pickle.dump(pj, output)
+    output.close()
+    if __builtin__.git:
+        import rpgit
+        rpgit.gitAdd(pickle_file_name)
+        comment = "A pickled Project from %s" % time.asctime()
+        rpgit.gitCommit(comment) 
+        
+    return pickle_file_name
     
 def unpickle_pj(pickle_file_name):
-        import cloud.serialization.cloudpickle as pickle
-        pickle_handle = open(pickle_file_name, 'rb')
-        pkl_pj = pickle.pickle.load(pickle_handle)
-        new_pj = Project(pkl_pj.loci)
-        attr_names = ['aln_summaries',
-                      'alignments',
-                      'concatenations',
-                      'records',
-                      'records_by_locus',
-                      'trees',
-                      'trimmed_alignments',
-                      ]
+    import cloud.serialization.cloudpickle as pickle
+    pickle_handle = open(pickle_file_name, 'rb')
+    pkl_pj = pickle.pickle.load(pickle_handle)
+    new_pj = Project(pkl_pj.loci)
+    attr_names = ['aln_summaries',
+                  'alignments',
+                  'concatenations',
+                  'records',
+                  'records_by_locus',
+                  'trees',
+                  'trimmed_alignments',
+                  ]
+    
+    for attr_name in attr_names:
+       setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
         
-        for attr_name in attr_names:
-           setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
-            
-        for i in pkl_pj.used_methods:
-            if isinstance(i, str):
-                new_pj.used_methods.append(i)
-            else:
-                new_pj.used_methods.append(str(i))
-        return new_pj
+    for i in pkl_pj.used_methods:
+        if isinstance(i, str):
+            new_pj.used_methods.append(i)
+        else:
+            new_pj.used_methods.append(str(i))
+    return new_pj
 
 def publish(pj, folder_name, figures_folder):
     
@@ -4445,9 +4468,9 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
         raise RuntimeError('get_query=True: currently only parses target. maybe Bio.SearchIO can help?')
     
     gencode = int(results.split('geneticcode ')[1].split()[0])
-    model = results.split('model ')[1].split()[0]
-    if not model == 'protein2genom':
-        warnings.warn("only tested with the protein2genome model")
+    model = stats[0]['model']
+    if not model == 'protein2genome:local':
+        raise RuntimeError("only tested with the protein2genome model")
     #gencode = '1'
     tfile = d
     if '/' in d:
@@ -4456,7 +4479,7 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
     b = 0
     records = []
     for match in matches:
-        ID = "%s|%s|%i"%(tfile[:4],tfile[-4:],b)
+        ID = ("%s|%s|%i"%(tfile[:4],tfile[-4:],b)).replace('.','')
         
         r = SeqRecord(seq=Seq(match['tfull'],
                               alphabet=IUPAC.unambiguous_dna),
@@ -4497,12 +4520,12 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
         CDS.qualifiers['gene'] = [match['qid']]
         get = False
         try:
-            CDS.qualifiers['translations'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
-            assert CDS.qualifiers['translations'][0] == str(Seq(match['tcds'].replace(' ',''),
+            CDS.qualifiers['translation'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
+            assert CDS.qualifiers['translation'][0] == str(Seq(match['tcds'].replace(' ',''),
                                                                 alphabet=IUPAC.ambiguous_dna).translate()).replace('*','X')
             get = True
         except:
-            CDS.qualifiers['translations'] = ['something went wrong']
+            CDS.qualifiers['translation'] = ['something went wrong']
             print "DEBUG bad CDS"
             print match['tid']
             #print len(CDS.extract(r.seq)), len(match['tcds'].replace(' ',''))
@@ -4519,6 +4542,73 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
             records.append(r)
     a = SeqIO.write(records,'%s.gb'%d,'genbank')
     return "%i in %s.gb"%(a, d)
+
+def report_aln_col_stat(pj, loci_names, num_col, figs_folder, trimmed=False, alg = '-scc'):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import random, os
+    from Bio import AlignIO
+    
+    # get the alignment objects
+    #-------------------------#
+    alignments = pj.alignments.items()
+    if trimmed:
+        alignments = pj.trimmed_alignments.items()
+    alignments = [i for i in alignments if i[0].split('@')[0] in loci_names]
+    num_alns = len(alignments)
+    subplots_arrangement = []
+    #-----------------------#
+    num_rows = round(float(num_alns)/num_col)
+    if num_rows < float(num_alns)/num_col:
+        num_rows += 1
+        
+    fig = plt.figure(figsize=(10*num_col,2.3*num_rows), dpi=80, frameon = False)
+    plt.subplots_adjust(hspace = 0.8)
+    subplots_arrangement += [num_rows, num_col]
+
+
+    #Calc with trimal and plot
+    #------------------------#
+    for i in range(1,num_alns+1):
+        import subprocess as sub
+        subplot_position = subplots_arrangement +[i]
+        aln_name = alignments[i-1][0]
+        aln_obj = alignments[i-1][1]
+        name = str(random.randint(1000,2000))+'_'+aln_name+'_for_trimal_graph.fasta'
+        AlignIO.write(aln_obj, name, 'fasta')
+        stderr = open('stderr','wt')
+        #stdout = os.popen('trimal '+alg+' -in '+name)#.read()
+        stdout = sub.Popen("trimal "+alg+" -in " + name,
+                       shell=True, stdout=sub.PIPE, stderr=stderr).stdout
+        stderr.close()
+        var = pd.read_table(stdout, sep='\t+', skiprows=3, engine='python')
+        os.remove('stderr')
+        if alg == '-scc':
+            var.columns = ['position', 'variability']
+        elif alg == '-sgc':
+            var.columns = ['position', 'pct_gaps', 'gap_score']
+        
+        #Plot residue similarity figure, for nucleotides this is identity value
+        fig.add_subplot(subplot_position[0], subplot_position[1], subplot_position[2])
+        if alg == '-scc':
+            var.variability.plot(color='g',lw=2)
+        elif alg == '-sgc':
+            var.pct_gaps.plot(color='g',lw=2)
+        plt.title(aln_name.replace('@',' '), fontsize=14)
+        plt.axis([1,len(aln_obj[0].seq), 0, 1.1]) #0 to 1 scale for y axis
+        xlab = "alignment position"
+        ylab = "similarity score"
+        if alg == '-sgc':
+            ylab = "percent gaps"
+            plt.axis([1, len(aln_obj[0].seq), 0, 110]) #0 to 100 scale for y axis, ie percent
+        plt.xlabel(xlab, fontsize=10)
+        plt.ylabel(ylab, fontsize=10)
+        plt.grid(True)
+        os.remove(name)
+    figname = str(random.randint(1000,2000))
+    fig.savefig(figs_folder + '/' + figname +'.png')
+    plt.close('all')
+    return figs_folder + '/' + figname+'.png'
 
 
 if __name__ == "__main__":
