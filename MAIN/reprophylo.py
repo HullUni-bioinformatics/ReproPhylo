@@ -248,8 +248,8 @@ class Concatenation:
     >>> loci = [coi, ssu, bssu, lsu, alg11]
     >>> concatenation = Concatenation(name='combined', loci=loci,
     ...                                otu_meta='OTU_name',
-    ...                                concat_must_have_all_of=['coi'],
-    ...                                concat_must_have_one_of =[['16S','28S'],['ALG11','18S']],
+    ...                                otu_must_have_all_of=['coi'],
+    ...                                otu_must_have_one_of =[['16S','28S'],['ALG11','18S']],
     ...                                define_trimmed_alns=["MuscleDefaults@dummyTrimMethod"])
     >>> print(str(concatenation))
     Concatenation named combined, with loci coi,18S,16S,28S,ALG11,
@@ -258,8 +258,8 @@ class Concatenation:
     Alignments with the following names: MuscleDefaults@dummyTrimMethod are prefered
     """
     
-    concat_must_have_all_of = []
-    concat_must_have_one_of = []
+    otu_must_have_all_of = []
+    otu_must_have_one_of = 'any'
     define_trimmed_alns = [] #should be Locus_name@Alignment_method_name@Trimming_mathod_name
     
     feature_id_dict = {}
@@ -268,16 +268,18 @@ class Concatenation:
                  name,
                  loci,
                  otu_meta,
-                 concat_must_have_all_of = concat_must_have_all_of,
-                 concat_must_have_one_of = concat_must_have_one_of,
+                 otu_must_have_all_of = otu_must_have_all_of,
+                 otu_must_have_one_of = otu_must_have_one_of,
                  define_trimmed_alns = define_trimmed_alns):
         self.name = name
         self.loci = loci
         self.otu_meta = otu_meta
-        self.concat_must_have_all_of = concat_must_have_all_of
-        self.concat_must_have_one_of = concat_must_have_one_of
-        if isinstance(concat_must_have_one_of[0],str):
-            raise IOError('The keyword \'concat_must_have_one_of\' has to be a list of lists')
+        self.otu_must_have_all_of = otu_must_have_all_of
+        self.otu_must_have_one_of = otu_must_have_one_of
+        if isinstance(otu_must_have_one_of[0],str) and not otu_must_have_one_of == 'any':
+            raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
+        if self.otu_must_have_one_of == 'any':
+            self.otu_must_have_one_of = [[l.name for l in self.loci]]
         self.feature_id_dict = {}
         self.define_trimmed_alns = define_trimmed_alns
         self.used_trimmed_alns = {}
@@ -299,12 +301,12 @@ class Concatenation:
             loci_string += l+','
         loci_string = loci_string[:-1]
         must_have = ''
-        for i in self.concat_must_have_all_of:
+        for i in self.otu_must_have_all_of:
             must_have += i+','
         must_have = must_have[:-1]
         trimmed_alignmnets_spec = ''
         one_of = ''
-        for i in self.concat_must_have_one_of:
+        for i in self.otu_must_have_one_of:
             one_of += '[ '
             for j in i:
                 one_of += j+' '
@@ -635,7 +637,62 @@ def get_qualifiers_dictionary(project, feature_id):
                         qualifiers_dictionary[qualifier]=feature.qualifiers[qualifier][0]
     return qualifiers_dictionary
 
-
+def __get_qualifiers_dictionary__(project, feature_id):
+    
+    """
+    Takes sequence record annotation, source qualifiers and feature qualifiers and puts them
+    in a flat dictionary
+    
+        
+    # Making a dummy locus    
+    >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
+    
+    # Making a dummy Project
+    >>> pj = Project([coi])
+    
+    # making a dummy record
+    >>> s = 'atgc'*1000
+    >>> location = FeatureLocation(1,100)
+    >>> feature = SeqFeature()
+    >>> feature.location = location
+    >>> feature.type = 'CDS'
+    >>> feature.qualifiers['gene'] = ['CoI']
+    >>> feature.qualifiers['feature_id'] = ['12345']
+    >>> source = SeqFeature()
+    >>> source.location = FeatureLocation(0,3999)
+    >>> source.type = 'source'
+    >>> source.qualifiers['organism'] = ['Tetillda radiata']
+    >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
+    >>> record.features.append(feature)
+    >>> record.features.append(source)
+    >>> record.annotations["evidence"] = 'made up'
+    >>> pj.records = [record]
+    
+    # executing get_qualifiers_dictionary()
+    >>> qual_dict = get_qualifiers_dictionary(pj, '12345')
+    >>> qual_items = qual_dict.items()
+    >>> qual_items.sort(key = lambda i: i[0])
+    >>> for key, val in qual_items: print(key.ljust(20,' ') + val.ljust(20,' '))
+    annotation_evidence made up             
+    feature_id          12345               
+    gene                CoI                 
+    source_organism     Tetillda radiata    
+    """
+    if type(feature_id) is list:
+        feature_id = feature_id[0]
+    record_id = feature_id.split('_')[0]
+    record = project._records_dict[record_id]
+    qualifiers_dictionary={}
+    for annotation in record.annotations.keys():
+        qualifiers_dictionary['annotation_'+annotation]=record.annotations[annotation]
+    for feature in record.features:
+        if feature.type == 'source':
+            for qualifier in feature.qualifiers.keys():
+                qualifiers_dictionary['source_'+qualifier]=feature.qualifiers[qualifier][0]
+        elif feature.qualifiers['feature_id'][0] == feature_id:
+            for qualifier in feature.qualifiers.keys():
+                qualifiers_dictionary[qualifier]=feature.qualifiers[qualifier][0]
+    return qualifiers_dictionary
 
 def seq_format_from_suffix(suffix):
     
@@ -827,6 +884,7 @@ class Project:
         Project object with the loci coi,18S,
         """
         self.records = []
+        self._records_dict = {}
         self.starttime = str(time.asctime())
         self.user = None
         if os.path.isfile('USER'):
@@ -879,7 +937,9 @@ class Project:
         return 'Project object with the loci '+loci_string
 
 
-
+    def __records_list_to_dict__(self):
+        self._records_dict = SeqIO.to_dict(self.records)
+        
     ###################################
     # Project methods for reading data
     ###################################  
@@ -1054,11 +1114,19 @@ class Project:
         # Read the alignment:
         raw_aln_input = list(AlignIO.read(filename, format))
         
+        
+        
         # make records
         records = []
         aln_records = []
         for record in raw_aln_input:
-            if not record.id in exclude:
+            total_seq_len = len(record.seq)
+            if (str(record.seq).count('-') + str(record.seq).count('.') + 
+                str(record.seq).count('?') + str(record.seq).count('N') +
+                str(record.seq).count('n') + str(record.seq).count('X') + 
+                str(record.seq).count('x')) == total_seq_len:
+                print 'dropping seq %s in locus %s: missing data'%(locus_name,record.id)
+            elif not record.id in exclude:
                 # remove gaps
                 new_record = SeqRecord(seq=Seq(str(record.seq).replace('-','').replace('.','')))
                 aln_record = SeqRecord(seq=Seq(str(record.seq).replace('.','-')))
@@ -1255,8 +1323,8 @@ class Project:
         # making dummy Concatenation
         >>> combined = Concatenation(name='combined', 
         ...                          loci=loci, otu_meta='OTU_dict',
-        ...                          concat_must_have_all_of=['coi'],
-        ...                          concat_must_have_one_of =[['18S','28S']],
+        ...                          otu_must_have_all_of=['coi'],
+        ...                          otu_must_have_one_of =[['18S','28S']],
         ...                          define_trimmed_alns=["MafftLinsi@Gappyout"])
         >>> print(str(combined))
         Concatenation named combined, with loci coi,18S,28S,
@@ -1322,82 +1390,7 @@ class Project:
                             OTU_list.append(qualifiers_dictionary[meta])
                             
             
-            if False: """This chunck checks for the presence of data
-            in the original records. It is therefore unaware of sequences
-            that were droped during alignment, trimming and filtering. It is now replaced by
-            the chunk below, checking for data availability in the trimmed alignments
-            instead.
-            
-            # make lists of available feature_ids in each locus
-            available_features = {}
-            for locus in s.loci:
-                available_features[locus.name] = []
-                for record in self.records_by_locus[locus.name]:
-                    available_features[locus.name].append(record.id) # record ids are feature ids because taken from pj.records_by_locus
-
-            # make a dict of individuals that fulfil the concat's first rule
-            seen_locus_names = []
-            included_individuals = {}
-            
-            for individual in OTU_list:
-                include = True
-                for must_have_locus_name in s.concat_must_have_all_of:
-                    if not must_have_locus_name in seen_locus_names:
-                        seen_locus_names.append(must_have_locus_name)
-                    locus_specific_features = []
-                    for feature_id in available_features[must_have_locus_name]:
-                        qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
-                        if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
-                            locus_specific_features.append(feature_id)
-                    if len(locus_specific_features) == 1:
-                        if not individual in included_individuals.keys():
-                            included_individuals[individual] = {}
-                        included_individuals[individual][must_have_locus_name] = locus_specific_features[0]
-                    elif len(locus_specific_features) > 1:
-                        raise RuntimeError(individual + ' is not unique for ' + must_have_locus_name)
-                    else:
-                        include = False
-                if individual in included_individuals.keys() and not include:
-                    included_individuals.pop(individual, None)
-                            
-            # check if the individual fullfil the second set rule
-            for individual in included_individuals.keys():
-                include = True
-                for loci_group in s.concat_must_have_one_of:
-                    count = 0
-                    for locus_name in loci_group:
-                        if not locus_name in seen_locus_names:
-                            seen_locus_names.append(locus_name)
-                        locus_specific_features = []
-                        for feature_id in available_features[locus_name]:
-                            qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
-                            if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
-                                locus_specific_features.append(feature_id)
-                        if len(locus_specific_features) == 1:
-                            count += 1
-                            included_individuals[individual][locus_name] = locus_specific_features[0]
-                        elif len(locus_specific_features) > 1:
-                            raise RuntimeError(individual + ' is not unique for ' + locus_name)
-                    if count == 0:
-                        include = False
-                if not include:
-                    included_individuals.pop(individual, None)
-
-            # add loci that are in the set but not addressed in rules
-            for individual in included_individuals.keys():
-                for locus in s.loci:
-                    locus_specific_features = []
-                    if not locus.name in seen_locus_names:
-                        for feature_id in available_features[locus.name]:
-                            qualifiers_dictionary = get_qualifiers_dictionary(self,feature_id)
-                            if meta in qualifiers_dictionary.keys() and qualifiers_dictionary[meta] == individual:
-                                locus_specific_features.append(feature_id)
-                        if len(locus_specific_features) == 1:
-                            included_individuals[individual][locus.name] = locus_specific_features[0]
-                        elif len(locus_specific_features) > 1:
-                            raise RuntimeError(individual + ' is not unique for ' + locus.name)
-
-            """
+        
     
             included_individuals = {} #included_individuals[otu][locus]=feautre_id
             
@@ -1437,7 +1430,7 @@ class Project:
                 use = True
                 
                 # Check first rule
-                for locus in s.concat_must_have_all_of:
+                for locus in s.otu_must_have_all_of:
                     token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
                     feature_ids = [r.id for r in self.trimmed_alignments[token]]
                     feature_found = False
@@ -1455,9 +1448,9 @@ class Project:
                         
                 # Check second rule
                 if use:
-                    for group in s.concat_must_have_one_of:
+                    for group in s.otu_must_have_one_of:
                         if isinstance(group,str):
-                            raise IOError('The keyword \'concat_must_have_one_of\' has to be a list of lists')
+                            raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
                         feature_found = False
                         for locus in group:
                             token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
@@ -1525,7 +1518,156 @@ class Project:
             self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
             s.feature_id_dict = included_individuals    
 
-
+    def __make_concatenation_alignments__(self):
+        
+        """
+        Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
+        to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
+        following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
+        trimmed alignment will be the Concatenation object name attribute.
+        """
+        for s in self.concatenations:
+            
+            # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
+            meta = s.otu_meta
+            OTU_list = []
+            for record in self.records:
+                for feature in record.features:
+                    if not feature.type == 'source':
+                        qualifiers_dictionary = __get_qualifiers_dictionary__(self,
+                                                                          feature.qualifiers['feature_id'])
+                        if (meta in qualifiers_dictionary.keys() and
+                            not qualifiers_dictionary[meta] in OTU_list):
+                            OTU_list.append(qualifiers_dictionary[meta])
+                            
+            
+        
+    
+            included_individuals = {} #included_individuals[otu][locus]=feautre_id
+            
+            #Get the correct trimmed alignment tokens
+            keys_of_trimmed_alignments_to_use_in_concat = []
+            for locus in s.loci:
+                trimmed_aln = None
+                all_locus_trimmed_alns_in_pj = []
+                for key in self.trimmed_alignments.keys():
+                    if locus.name == key.split('@')[0]:
+                        all_locus_trimmed_alns_in_pj.append(key)
+                if len(all_locus_trimmed_alns_in_pj) == 1:
+                    trimmed_aln = all_locus_trimmed_alns_in_pj[0]
+                elif len(all_locus_trimmed_alns_in_pj) == 0:
+                    raise RuntimeError('Locus '+locus.name+' have no trimmed alignments')
+                else:
+                    s.define_trimmed_alns.sort(key = lambda i: i.count('@'), reverse=True)
+                    for definition in s.define_trimmed_alns:
+                        if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
+                            trimmed_aln = definition
+                        elif definition.count('@') == 1 and any([definition in i for i in all_locus_trimmed_alns_in_pj]):
+                            trimmed_aln = locus.name+'@'+definition
+                        else:
+                            raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
+                                                locus.name+"' out of "+str(all_locus_trimmed_alns_in_pj))
+                if trimmed_aln:
+                    keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
+                else:
+                    raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
+            
+            #print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
+            
+            #if len(included_individuals.keys()) < 4:
+            #    raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
+            for otu in OTU_list:
+                otu_features = {}
+                use = True
+                
+                # Check first rule
+                for locus in s.otu_must_have_all_of:
+                    token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+                    feature_ids = [r.id for r in self.trimmed_alignments[token]]
+                    feature_found = False
+                    count = 0
+                    for feature_id in feature_ids:
+                        qualifiers = __get_qualifiers_dictionary__(self, feature_id)
+                        if meta in qualifiers.keys() and otu == qualifiers[meta]:
+                            count += 1
+                            feature_found = True
+                            otu_features[locus] = feature_id
+                    if count > 1:
+                        raise RuntimeError("%s is not unique in %s"%(otu, locus))
+                    if not feature_found:
+                        use = False
+                        
+                # Check second rule
+                if use:
+                    for group in s.otu_must_have_one_of:
+                        if isinstance(group,str):
+                            raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
+                        feature_found = False
+                        for locus in group:
+                            token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+                            feature_ids = [r.id for r in self.trimmed_alignments[token]]
+                            count = 0
+                            for feature_id in feature_ids:
+                                qualifiers = __get_qualifiers_dictionary__(self, feature_id)
+                                if meta in qualifiers.keys() and otu == qualifiers[meta]:
+                                    count += 1
+                                    feature_found = True
+                                    otu_features[locus] = feature_id
+                            if count > 1:
+                                raise RuntimeError("%s is not unique in %s"%(otu, locus))
+                        if not feature_found:
+                            use = False
+                if use:
+                    included_individuals[otu] = otu_features
+            
+            # printing a table of the alignment
+            included_indivduals_table = ''
+            loci_names = [l.name for l in s.loci]
+            line = 'OTU'.ljust(30,' ')
+            for name in loci_names:
+                line += name.ljust(20,' ')
+            included_indivduals_table += line+'\n'
+            for otu in included_individuals.keys():
+                line = otu.ljust(30,' ')
+                for locus_name in loci_names:
+                    if locus_name in included_individuals[otu].keys():
+                        line += included_individuals[otu][locus_name].ljust(15,' ')
+                    else:
+                        line += ''.ljust(15,' ')
+                included_indivduals_table += line+'\n'
+            print "Concatenation %s will have the following data"%s.name
+            print included_indivduals_table
+            
+            # remove partitions with less then 4 sequences
+            for name in loci_names:
+                if len([otu for otu in included_individuals.keys() if name in included_individuals[otu].keys()]) < 4:
+                    print (("Locus %s has less then 4 sequences in concatenation %s and where excluded "+
+                                         "from the concatenation")%(name,s.name))
+                    for key in keys_of_trimmed_alignments_to_use_in_concat:
+                        if name in key:
+                            keys_of_trimmed_alignments_to_use_in_concat.remove(key)
+                            
+                                        
+            
+            # build alignment
+            # concat_records = []
+            alignment = []
+            for individual in included_individuals.keys():
+                sequence = ''
+                for key in keys_of_trimmed_alignments_to_use_in_concat:
+                    locus_name = key.split('@')[0]                    
+                    length = len(self.trimmed_alignments[key][0])
+                    s.used_trimmed_alns[key] = length
+                    if locus_name in included_individuals[individual].keys():
+                        for record in self.trimmed_alignments[key]:
+                            if record.id == included_individuals[individual][locus_name]:
+                                sequence += str(record.seq)
+                    else:
+                        sequence += '?'*length
+                concat_sequence = SeqRecord(seq = Seq(sequence), id = individual, description = '')
+                alignment.append(concat_sequence)
+            self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
+            s.feature_id_dict = included_individuals 
 
     ###################################################
     # Project methods for modifying feature qualifiers
@@ -2821,6 +2963,22 @@ class Project:
             return records
         
    
+    def propagate_metadata(self):
+        for t in self.trees.keys():
+            for l in self.trees[t][0]:
+                feature_id = l.feature_id
+                record_id = feature_id.rpartition('_')[0]
+                record = [r for r in self.records if r.id == record_id][0]
+                annotations = record.annotations
+                source_qualifiers = [f for f in record.features if f.type == 'source'][0].qualifiers
+                feature_qualifiers = [f for f in record.features if f.qualifiers['feature_id'][0] == feature_id][0].qualifiers
+                for i in annotations:
+                    l.add_feature("annotations_%s"%i,type_to_single_line_str(annotations[i]))
+                for i in source_qualifiers:
+                    l.add_feature("source_%s"%i,type_to_single_line_str(source_qualifiers[i]))
+                for i in feature_qualifiers:
+                    l.add_feature(i,type_to_single_line_str(feature_qualifiers[i]))
+            self.trees[t][1] = self.trees[t][0].write(features=[])
                 
 ##############################################################################################
 class AlnConf:
@@ -3637,11 +3795,11 @@ def report_methods(pj, figs_folder, output_directory):
             # This will write the concatenation attribute
             report_lines.append('Rules for  \"' + c.name + '\":')
             rule_1 = 'OTUs must have the loci: '
-            for locus in c.concat_must_have_all_of:
+            for locus in c.otu_must_have_all_of:
                 rule_1 += locus + ', '
             report_lines.append(rule_1)
             rule_2 = 'OTUs must have at least one of each group: '
-            for group in c.concat_must_have_one_of:
+            for group in c.otu_must_have_one_of:
                 rule_2 += str(group) +', '
             report_lines += (rule_2, '')
             
