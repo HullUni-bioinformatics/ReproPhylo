@@ -2455,6 +2455,9 @@ class Project:
                         t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'1')
                     elif raxml_method.preset == 'fd_b_fb':
                         t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'2')
+                    elif raxml_method.preset == 'fd_fJ' or raxml_method.preset == 'fF_fJ':
+                        tree_filename = 'RAxML_fastTreeSH_Support.'+raxml_method.id+'_'+trimmed_alignment+'1'
+                        t = Tree(use_sh_support_as_branch_support(tree_filename))
                 elif isinstance(raxml_method, PbConf):
                     base_name = "%s_%s"%(raxml_method.id, trimmed_alignment)
                     trees_file = "%s.1.treelist"%base_name
@@ -2727,6 +2730,10 @@ class Project:
                 ns = NodeStyle()
                 ns['size'] = 0
                 ns['fgcolor'] = 'black'
+                ns['vt_line_width'] = 2
+                ns['hz_line_width'] = 2
+                ns['hz_line_color'] = 'DimGray'
+                ns['vt_line_color'] = 'DimGray'
                 for n in self.trees[tree][0].traverse():
                     n.set_style(ns)
                 self.trees[tree][0].set_style(ns)
@@ -2743,6 +2750,10 @@ class Project:
                             ns = NodeStyle(bgcolor=node_bg_color[key])
                             ns['size']=0
                             ns['fgcolor']='black'
+                            ns['vt_line_width'] = 2
+                            ns['hz_line_width'] = 2
+                            ns['hz_line_color'] = 'DimGray'
+                            ns['vt_line_color'] = 'DimGray'
                             node.set_style(ns)
                 
     
@@ -2763,16 +2774,6 @@ class Project:
             print fig_folder
             sys.stdout = stdout
      
-
-
-#    def trim(self):
-#        for aln in self.alignments.keys():
-#            AlignIO.write(self.alignments[aln],aln+'_aln.fasta','fasta')
-#            stdout = os.popen('trimal -in '+ aln +'_aln.fasta -gappyout').read()
-#            align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.ambiguous_dna)
-#            for record in align:
-#                record.description = ''
-#            self.trimmed_alignments[aln+'@'+'dummyTrimMethod'] = align
             
     def trim(self, list_of_Conf_objects):
         for m in list_of_Conf_objects:
@@ -3220,7 +3221,7 @@ def use_sh_support_as_branch_support(tree_filename):
     string = re.sub(r'\[',r'[&&NHX:support=',string)
     t = Tree(string)
     t.dist=0
-    t.write(outfile=tree_filename)
+    t.write(features=[])
     #t.show()
     
 def transfer_support_same_topo(tree_file_with_support,
@@ -3373,7 +3374,30 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                                                        '-m': model,
                                                        '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
                                                        '-z': 'RAxML_bootstrap.'+tree_method.id+'_'+trimmed_alignment_name+'1'}
-                         ]
+                         ],
+                'fF_fJ': [{'-f': 'F',
+                           '-p': random.randint(99,999),
+                           '-s': input_filename,
+                           '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
+                           '-m': model},{'-f': 'J',
+                                         '-t': 'RAxML_fastTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
+                                         '-p': random.randint(99,999),
+                                         '-s': input_filename,
+                                         '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
+                                         '-m': model}],
+                
+                'fd_fJ': [{'-f': 'd',
+                          '-p': random.randint(99,999),
+                          '-s': input_filename,
+                          '-N': ML_replicates,
+                          '-n': tree_method.id+'_'+trimmed_alignment_name+'0',
+                          '-m': model},{'-f': 'J',
+                                         '-t': 'RAxML_bestTree.'+tree_method.id+'_'+trimmed_alignment_name+'0',
+                                         '-p': random.randint(99,999),
+                                         '-s': input_filename,
+                                         '-n': tree_method.id+'_'+trimmed_alignment_name+'1',
+                                         '-m': model}]
+                
                 }
 
     
@@ -3579,7 +3603,7 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     return figs_folder + '/' + name+'.png'
     
 #################################################################################
-def report_methods(pj, figs_folder, output_directory):
+def report_methods(pj, figs_folder, output_directory, size='small'):
 #################################################################################
         """
         Main HTML reporting function. This function iterates over the 
@@ -3994,7 +4018,7 @@ def report_methods(pj, figs_folder, output_directory):
         #------------------------------------------------------------------------
         title = 'per position alignmnet statistics'.title()
         report_lines += ('<h3>', title, '</h3>', '')
-        if len(pj.alignments.keys())>0:                    
+        if len(pj.alignments.keys())>0 and not size == 'small':                    
             title = 'Alignment statistics before trimming'
             report_lines += ('', '<h4>', title, '</h4>', '')
             report_lines += ['<h4>','Trimal\'s Residue Similarity Score (-scc)','</h4>', '']
@@ -4023,9 +4047,9 @@ def report_methods(pj, figs_folder, output_directory):
                     report_lines.append(img_tag)
                     #os.remove(fig_file)
         else:
-            report_lines += ['No alignments in this project','']
+            report_lines += ['No alignments or too many alignments in this project','']
             
-        if len(pj.trimmed_alignments.keys())>0:          
+        if len(pj.trimmed_alignments.keys())>0 and not size=='small':          
             title = 'Alignment statistics after trimming'
             report_lines += ('', '<h4>', title, '</h4>', '')
             report_lines += ['<h4>','"Trimal\'s Residue Similarity Score (-scc)','</h4>', '']
@@ -4049,7 +4073,7 @@ def report_methods(pj, figs_folder, output_directory):
                     report_lines.append(img_tag)
                     #os.remove(fig_file)
         else:
-            report_lines += ['No trimmed alignments in this project','']
+            report_lines += ['No trimmed alignments, or too many, in this project','']
         
         print "making RF matrix"
         title = 'Robinson-Foulds distances'.title()
@@ -4160,7 +4184,7 @@ def unpickle_pj(pickle_file_name):
             new_pj.used_methods.append(str(i))
     return new_pj
 
-def publish(pj, folder_name, figures_folder):
+def publish(pj, folder_name, figures_folder, size='small'):
     
     import os, time
     folder = None
@@ -4179,7 +4203,7 @@ def publish(pj, folder_name, figures_folder):
     pj.write(folder+'/tree_and_alns.nexml','nexml')
     pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
-    lines = report_methods(pj, figures_folder, folder_name)
+    lines = report_methods(pj, figures_folder, folder_name, size)
     for line in lines:
         report.write(line + '\n')
     report.close()
