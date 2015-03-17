@@ -4660,8 +4660,18 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
     matches = stats
     b = 0
     records = []
+    # making a short enough, yet unique and informative seq id is a challenge
+    # The approach here is to take the 4 first and last chars of the input file name
+    # and to add a serial number for each seq.
+    
+    # We add a random three digit number at the start
+    # because the eight file name chars are not always unique accorss files.
+    from random import randint
+        
+    rnd = randint(111,999)
+    
     for match in matches:
-        ID = ("%s|%s|%i"%(tfile[:4],tfile[-4:],b)).replace('.','')
+        ID = ("%i|%s|%s|%i"%(rnd, tfile[:4],tfile[-4:],b)).replace('.','')
         
         r = SeqRecord(seq=Seq(match['tfull'],
                               alphabet=IUPAC.unambiguous_dna),
