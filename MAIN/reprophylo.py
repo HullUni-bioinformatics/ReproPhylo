@@ -57,6 +57,9 @@ from Bio.Phylo.Applications import RaxmlCommandline
 from Bio.Align import MultipleSeqAlignment
 from Bio.SeqUtils import GC
 from ete2 import *
+from collections import Counter
+#import pandas as pd
+import math
 import __builtin__
 
 
@@ -327,7 +330,7 @@ if False:
     """
     Reprophylo Project Utilities
     
-    Used in the Project class but are not in the classes methods
+    Used in the Project class but are not in the classe's methods
     """
 ##############################################################################################
 
@@ -640,43 +643,10 @@ def get_qualifiers_dictionary(project, feature_id):
 def __get_qualifiers_dictionary__(project, feature_id):
     
     """
-    Takes sequence record annotation, source qualifiers and feature qualifiers and puts them
-    in a flat dictionary
+    This will replace the public version. It uses the Project._records_dict to  pull 
+    the record using the record id, instead of iterating Project.records, which is very slow.
     
-        
-    # Making a dummy locus    
-    >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
-    
-    # Making a dummy Project
-    >>> pj = Project([coi])
-    
-    # making a dummy record
-    >>> s = 'atgc'*1000
-    >>> location = FeatureLocation(1,100)
-    >>> feature = SeqFeature()
-    >>> feature.location = location
-    >>> feature.type = 'CDS'
-    >>> feature.qualifiers['gene'] = ['CoI']
-    >>> feature.qualifiers['feature_id'] = ['12345']
-    >>> source = SeqFeature()
-    >>> source.location = FeatureLocation(0,3999)
-    >>> source.type = 'source'
-    >>> source.qualifiers['organism'] = ['Tetillda radiata']
-    >>> record = SeqRecord(seq=Seq(s, IUPAC.ambiguous_dna), id='1', description='spam')
-    >>> record.features.append(feature)
-    >>> record.features.append(source)
-    >>> record.annotations["evidence"] = 'made up'
-    >>> pj.records = [record]
-    
-    # executing get_qualifiers_dictionary()
-    >>> qual_dict = get_qualifiers_dictionary(pj, '12345')
-    >>> qual_items = qual_dict.items()
-    >>> qual_items.sort(key = lambda i: i[0])
-    >>> for key, val in qual_items: print(key.ljust(20,' ') + val.ljust(20,' '))
-    annotation_evidence made up             
-    feature_id          12345               
-    gene                CoI                 
-    source_organism     Tetillda radiata    
+    It requires Project.__records_list_to_dict__() to execute beforehand.
     """
     if type(feature_id) is list:
         feature_id = feature_id[0]
@@ -853,6 +823,75 @@ def loci_list_from_csv(loci):
                                loci_dict[name]['aliases']))
     return loci_list
 
+def parse_paup_charset(nexus_filename):
+    
+    """ 
+    Takes a nexus file with PAUP style charset commands.
+    Returns a dictionary with partition names as keys and a list of
+    integers representing the start and end of the partition as a value.
+    Position count starts from 0.
+    
+    Handles paup commands of the following format:
+    CHARSET  locus_name=1-129;
+    or
+    charset locus_name = 1 - 129 ;
+    """
+    
+    charsets = {}
+    charset_lines = [l for l in open(nexus_filename,'r').readlines() if 
+                     (l.startswith('CHARSET') or l.startswith('charset'))]
+    if len(charset_lines) == 0:
+        raise IOError("There are no CHARSET commands in %s"%nexus_filename)
+    for line in charset_lines:
+        try:
+            info = line.split()[1].split(';')[0]
+            locus_name, range = info.split('=')
+            locus_name = locus_name.strip().rstrip()
+            start = int(range.split('-')[0].strip().rstrip())-1
+            end = int(range.split('-')[1].strip().rstrip())-1
+            charsets[locus_name] = [start,end]
+        except:
+            raise IOError('Expects "charset set_name = start_int - end_int;"'+
+                          ' (case insensitive, spaces around the "=" or "-" not mandatory). Got %s'%line)
+    return charsets
+        
+def pj_from_nexus_w_charset(nexus_filename, output_dir, char_type, feature_type, project=False):
+    
+    """ 
+    Takes a nexus file with PAUP style charset commands as input.
+    Creates a separate fasta file for each alignment partition
+    Returns a list of fasta filenames and a list of Locus objects
+    If project==True, returns a Project instance with the loci, alignments and records instead
+    """
+    
+    from reprophylo import Locus
+    from Bio import AlignIO
+    
+    charsets = parse_paup_charset(nexus_filename)
+    
+    alignment =  AlignIO.read(nexus_filename, 'nexus')
+    filenames = []
+    loci_list = []
+    for locus_name in charsets:
+        s = charsets[locus_name][0]
+        e = charsets[locus_name][1]
+        outname = "%s/%s.fasta"%(output_dir,locus_name)
+        AlignIO.write(alignment[:, s:e], outname, 'fasta')
+        filenames.append(outname)
+        loci_list.append(Locus(char_type, feature_type, locus_name, [locus_name]))
+    
+    if project:
+        from reprophylo import Project
+        pj = Project(loci_list)
+        for f in filenames:
+            locus_name = f.split('/')[-1].split('.')[0]
+            print '%i/%i reading %s'%(i,len(filenames), locus_name)
+            i += 1
+            pj.read_alignment(f, char_type, feature_type, locus_name)
+        return pj
+            
+    else:  
+        return filenames, loci_list
 
 ##############################################################################################
 class Project:
@@ -2334,16 +2373,16 @@ class Project:
         title_length = max([len(r.id) for r in records])+2
         
         # colors
-        dna_colors = {'a':'green',
-                      'A':'green',
-                      'T':'red',
-                      't':'red',
-                      'U':'red',
-                      'u':'red',
+        dna_colors = {'a':'MediumSeaGreen',
+                      'A':'MediumSeaGreen',
+                      'T':'Salmon',
+                      't':'Salmon',
+                      'U':'Salmon',
+                      'u':'Salmon',
                       'g':'lightgray',
                       'G':'lightgray',
-                      'c':'blue',
-                      'C':'blue'
+                      'c':'Teal',
+                      'C':'Teal'
                       }
         protein_colors = {'R':'blueviolet',
                           'r':'blueviolet',
@@ -4719,8 +4758,8 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
         get = False
         try:
             CDS.qualifiers['translation'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
-            assert CDS.qualifiers['translation'][0] == str(Seq(match['tcds'].replace(' ',''),
-                                                                alphabet=IUPAC.ambiguous_dna).translate()).replace('*','X')
+            assert CDS.qualifiers['translation'][0] == str(Seq(match['tcds'].replace(' ','').replace('\n',''),
+                                                                alphabet=IUPAC.ambiguous_dna).translate(table=gencode)).replace('*','X')
             get = True
         except:
             CDS.qualifiers['translation'] = ['something went wrong']
@@ -4808,6 +4847,532 @@ def report_aln_col_stat(pj, loci_names, num_col, figs_folder, trimmed=False, alg
     plt.close('all')
     return figs_folder + '/' + figname+'.png'
 
+##############################################################################################################
+if False:
+    """"LociStat class preliminaries"""
+##############################################################################################################
+
+def entropy(s, char_type):
+    """
+    Return the Shannon's entropy value for a column in the alignment provided as a string (s) 
+    given the character type (dna or prot).
+    
+    gaps are ignored, ambiguity is ignored.
+    
+    
+    homogenous column
+    
+    >>> entropy('tttttttt', 'dna')
+    -0.0
+    
+    hetrogenous column, case insensitive
+    
+    >>> entropy('ttgGaacC', 'dna')
+    2.0
+    >>> entropy('ttggaacc', 'dna')
+    2.0
+    
+    ignore gaps
+    
+    >>> entropy('ttgg--Ss', 'dna')
+    1.0
+    >>> entropy('ttggSs', 'dna')
+    1.0
+    
+    recognize alphabet
+    
+    >>> entropy('ttggSs', 'prot')
+    1.584962500721156
+    """
+    missing = None
+    if char_type == 'prot':
+        missing = 'Xx'
+    elif char_type == 'dna':
+        missing = 'ryswkmbdhvnRYSWKMBDHVN'
+    s = s.replace('-','').replace('.','').replace('?','')
+    for m in missing:
+        s = s.replace(m,'')
+    p, lns = Counter(s.lower()), float(len(s.lower()))
+    
+    return -sum( count/lns * math.log(count/lns, 2) for count in p.values())
+
+def gapscore(aln_obj):
+    
+    """
+    Use  TrimAl to get a list of gapscores given a MultipleSeqAlignmnet
+    object
+    """
+    
+    import pandas as pd
+    name = str(random.randint(1000,2000))+'_for_trimal_graph.fasta'
+    AlignIO.write(aln_obj, name, 'fasta')
+    stderr = open('stderr','wt')
+    stdout = sub.Popen(programspath+"trimal -sgc -in " + name,
+                       shell=True, stdout=sub.PIPE, stderr=stderr).stdout
+    stderr.close()
+    var = pd.read_table(stdout, sep='\t+', skiprows=3, engine='python')
+    os.remove('stderr')
+    var.columns = ['position', 'pct_gaps', 'gap_score']
+    os.remove(name)  
+    return [i[1] for i in var.to_dict()['gap_score'].items()]
+
+def conservation(aln_obj):
+    
+    """
+    Use  TrimAl to get a list of conservation values given a MultipleSeqAlignmnet
+    object
+    """
+    import pandas as pd
+    name = str(random.randint(1000,2000))+'_for_trimal_graph.fasta'
+    AlignIO.write(aln_obj, name, 'fasta')
+    stderr = open('stderr','wt')
+    stdout = sub.Popen(programspath+"trimal -scc -in " + name,
+                       shell=True, stdout=sub.PIPE, stderr=stderr).stdout
+    stderr.close()
+    var = pd.read_table(stdout, sep='\t+', skiprows=3, engine='python')
+    os.remove('stderr')
+    var.columns = ['position', 'conservation']
+    os.remove(name)  
+    return [i[1] for i in var.to_dict()['conservation'].items()]
+
+def get_entropies(pj, trimmed = True, alignmnet_method=None, trimming_method=None):
+    
+    """
+    Return a dictionary with alignment names as keys and  entropy keys as values
+    given the alignments or trimmed alignmnets dictionary.
+    
+    
+    If a locus has more than one alignment in the dictionary, go for the specified method
+    or the first occurance
+    """
+    entropies = {}
+    aln_dict = None
+    if trimmed:
+        aln_dict = pj.trimmed_alignments
+        if aln_dict == {}:
+            raise IOError("No trimed alignments in the Project")
+                          
+    elif not trimmed:
+        aln_dict = pj.alignments
+        if aln_dict == {}:
+            raise IOError("No alignments in the Project")
+        
+    for aln_name in aln_dict.keys():
+        char_type = None
+        char_type_list = [l.char_type for l in pj.loci if l.name == aln_name.split('@')[0]]
+        get = True
+        if len(char_type_list) == 0:
+            get = False
+            warnings.warn('Cannot find Locus for alignment %s. Is it a supermatrix? Skipping.'%aln_name)            
+        elif len(char_type_list) > 1:
+            if (alignmnet_method and 
+                not aln_name.split('@')[1] == alignmnet_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,alignmnet_method)
+            elif (trimmed and trimming_method and 
+                not aln_name.split('@')[2] == trimming_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,trimming_method)  
+            elif aln_name.split('@')[0] in [i.split('@')[0] for i in entropies.keys()]:
+                exists = [i for i in entropies.keys() if i.split('@')[0] == aln_name.split('@')[0]][0]
+                get = False
+                warning.warn('Skipping %s, already have %s'%aln_name, exists)
+        if get:    
+            char_type = char_type_list[0]
+            aln_obj = aln_dict[aln_name]
+            entropies[aln_name] =[]
+            for i in range(aln_obj.get_alignment_length()):
+                column = aln_obj[:,i]
+                entropies[aln_name].append(entropy(column, char_type))
+
+    return entropies
+
+def get_gapscores(pj, trimmed = True, alignmnet_method=None, trimming_method=None):
+    
+    """
+    Return a dictionary with alignment names as keys and  gap scores as values
+    given the alignments or trimmed alignmnets dictionary.
+    
+    
+    If a locus has more than one alignment in the dictionary, go for the specified method
+    or the first occurance
+    """
+    gapscores = {}
+    aln_dict = None
+    if trimmed:
+        aln_dict = pj.trimmed_alignments
+        if aln_dict == {}:
+            raise IOError("No trimed alignments in the Project")
+    elif not trimmed:
+        aln_dict = pj.alignments
+        if aln_dict == {}:
+            raise IOError("No alignments in the Project")
+        
+    for aln_name in aln_dict.keys():
+        char_type = None
+        char_type_list = [l.char_type for l in pj.loci if l.name == aln_name.split('@')[0]]
+        get = True
+        if len(char_type_list) == 0:
+            get = False
+            warnings.warn('Cannot find Locus for alignment %s. Is it a supermatrix? Skipping.'%aln_name)            
+        elif len(char_type_list) > 1:
+            if (alignmnet_method and 
+                not aln_name.split('@')[1] == alignmnet_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,alignmnet_method)
+            elif (trimmed and trimming_method and 
+                not aln_name.split('@')[2] == trimming_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,trimming_method)  
+            elif aln_name.split('@')[0] in [i.split('@')[0] for i in gapscores.keys()]:
+                exists = [i for i in gapscores.keys() if i.split('@')[0] == aln_name.split('@')[0]][0]
+                get = False
+                warning.warn('Skipping %s, already have %s'%aln_name, exists)   
+        if get:    
+            char_type = char_type_list[0]
+            aln_obj = aln_dict[aln_name]
+            gapscores[aln_name] = gapscore(aln_obj)  
+    return gapscores
+
+def get_conservations(pj, trimmed = True, alignmnet_method=None, trimming_method=None):
+    """
+    Return a dictionary with alignment names as keys and  conservation scores as values
+    given the alignments or trimmed alignmnets dictionary.
+    
+    
+    If a locus has more thn one alignment in the dictionary, go for the specified method
+    or the first occurance
+    """
+    conservations = {}
+    aln_dict = None
+    if trimmed:
+        aln_dict = pj.trimmed_alignments
+        if aln_dict == {}:
+            raise IOError("No trimed alignments in the Project")
+            
+    elif not trimmed:
+        aln_dict = pj.alignments
+        if aln_dict == {}:
+            raise IOError("No alignments in the Project")
+        
+    for aln_name in aln_dict.keys():
+        char_type = None
+        char_type_list = [l.char_type for l in pj.loci if l.name == aln_name.split('@')[0]]
+        get = True
+        if len(char_type_list) == 0:
+            get = False
+            warnings.warn('Cannot find Locus for alignment %s. Is it a supermatrix? Skipping.'%aln_name)            
+        elif len(char_type_list) > 1:
+            if (alignmnet_method and 
+                not aln_name.split('@')[1] == alignmnet_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,alignmnet_method)
+            elif (trimmed and trimming_method and 
+                not aln_name.split('@')[2] == trimming_method):
+                get = False
+                warnings.warn('Skipping %s, taking only %s'%aln_name,trimming_method) 
+            elif aln_name.split('@')[0] in [i.split('@')[0] for i in conservations.keys()]:
+                exists = [i for i in conservations.keys() if i.split('@')[0] == aln_name.split('@')[0]][0]
+                get = False
+                warning.warn('Skipping %s, already have %s'%aln_name, exists)       
+        if get:    
+            char_type = char_type_list[0]
+            aln_obj = aln_dict[aln_name]
+            conservations[aln_name] = conservation(aln_obj)  
+    return conservations
+
+def get_sequence_lengths(pj):
+    
+    """
+    Return a dictionary with locus names as keys and lists of sequence length as values
+    given a Project instance.
+    
+    The length are calculated from the unaligned and untrimmed sequences
+    """
+    
+    if len(pj.records) == 0:
+            raise IOError('No records in the Project')
+    
+    lengths = {}
+
+    
+    if len(pj.records_by_locus) == 0:
+        pj.extract_by_locus()
+    
+    for locus in pj.records_by_locus:
+        lengths[locus] = []
+        for r in pj.records_by_locus[locus]:
+            lengths[locus].append(len(r.seq))
+    return lengths
+
+def get_sequence_gcs(pj):
+    
+    """
+    Return a dictionary with locus names as keys and lists of sequence %GC as values
+    given a Project instance.
+    
+    The %GC are calculated from the unaligned and untrimmed sequences
+    """
+    
+    if len(pj.records) == 0:
+            raise IOError('No records in the Project')
+    
+    gcs = {}
+    
+    if len(pj.records_by_locus) == 0:
+        pj.extract_by_locus()
+    
+    if any([l.char_type == 'prot' for l in pj.loci]):
+        warnings.warn('Protein loci GC content will be set to 0.0')
+    
+    for locus in pj.records_by_locus:
+        char_type = [l for l in pj.loci if l.name == locus][0].char_type
+        if char_type == 'dna':
+            gcs[locus] = []
+    
+            for r in pj.records_by_locus[locus]:
+                gcs[locus].append(GC(r.seq))
+        else:
+            gcs[locus] = [0.0, 0.0, 0.0, 0.0]
+        
+    return gcs
+        
+def remove_border(axes=None, top=False, right=False, left=True, bottom=True):
+    """
+    Minimize chartjunk by stripping out unnecesasry plot borders and axis ticks
+    
+    The top/right/left/bottom keywords toggle whether the corresponding plot border is drawn
+    """
+    ax = axes or plt.gca()
+    ax.spines['top'].set_visible(top)
+    ax.spines['right'].set_visible(right)
+    ax.spines['left'].set_visible(left)
+    ax.spines['bottom'].set_visible(bottom)
+    
+    #turn off all ticks
+    ax.yaxis.set_ticks_position('none')
+    ax.xaxis.set_ticks_position('none')
+    
+    #now re-enable visibles
+    if top:
+        ax.xaxis.tick_top()
+    if bottom:
+        ax.xaxis.tick_bottom()
+    if left:
+        ax.yaxis.tick_left()
+    if right:
+        ax.yaxis.tick_right()
+
+#########################################################################################
+class LociStats:
+#########################################################################################
+    
+    def __init__(self, pj, trimmed=True, alignmnet_method=None, trimming_method=None):
+        
+        self.loci = pj.loci
+        
+        self.entropeis = get_entropies(pj,
+                                       trimmed = trimmed,
+                                       alignmnet_method=alignmnet_method,
+                                       trimming_method=trimming_method)
+        
+        self.gapscores = get_gapscores(pj,
+                                       trimmed = trimmed,
+                                       alignmnet_method=alignmnet_method,
+                                       trimming_method=trimming_method)
+        
+        self.conservations = get_conservations(pj,
+                                               trimmed = trimmed,
+                                               alignmnet_method=alignmnet_method,
+                                               trimming_method=trimming_method)
+        
+        self.sequence_lengths = get_sequence_lengths(pj)
+        
+        self.sequence_gcs = get_sequence_gcs(pj)
+        
+        combined = []
+        
+        for key in self.sequence_lengths:
+            locus_stats = [key]
+            
+            entropies = [self.entropeis[i] for i in self.entropeis.keys() if i.split('@')[0] == key][0]
+            gapscores = [self.gapscores[i] for i in self.gapscores.keys() if i.split('@')[0] == key][0]
+            conservations = [self.conservations[i] for i in self.conservations.keys() if i.split('@')[0] == key][0]
+            
+            combined.append([key,
+                             self.sequence_lengths[key],
+                             self.sequence_gcs[key],
+                             entropies,
+                             gapscores,
+                             conservations])
+            
+        self.loci_stats = combined
+        
+        self.loci_stats_sorted = None
+        
+    def sort(self, parameter = 'entropy', percentile=50, percentile_range=(25,75), reverse = True):
+        j = None
+        if parameter == 'entropy':
+            j = 3
+        elif parameter == 'gapscore':
+            j = 4
+        elif parameter == 'conservation':
+            j = 5
+        elif parameter == 'sequence_length':
+            j = 1
+        elif parameter == 'sequence_gc':
+            j = 2
+        
+        self.loci_stats_sorted = sorted(self.loci_stats,
+                                        key=lambda i: (np.percentile(i[j], percentile),
+                                                       abs(np.percentile(i[j], percentile_range[1])-
+                                                           np.percentile(i[j], percentile_range[0]))),
+                                        reverse=reverse)
+        self.loci_stats_sorted = [list(i) for i in self.loci_stats_sorted]
+        
+    def plot(self, filename, figsize=(30,10), params='all', lable_fsize=40, xtick_fsize=4, ytick_fsize=4):
+        parameter_indices = [3,4,5,1,2]
+        
+        ytitles=['',
+                 'Sequence Lengths',
+                 'Sequence %GC',
+                 'Entropy',
+                 'Gap Score', 
+                 'Conservation Scores']
+        
+        if not  params=='all':
+            parameter_indices = []
+            for param in params:
+                if param == 'entropy':
+                    parameter_indices.append(3)
+                elif param == 'gapscore':
+                    parameter_indices.append(4)
+                elif param == 'conservation':
+                    parameter_indices.append(5)
+                elif param == 'sequence_length':
+                    parameter_indices.append(1)
+                elif param == 'sequence_gc':
+                    parameter_indices.append(2)
+        if len(parameter_indices) == 0:
+            raise IOError('Must specify at least one parameter to plot')
+                
+        #fig = plt.figure(figsize=figsize, dpi=80, frameon = False)
+        
+        fig, axes = plt.subplots(len(parameter_indices), sharex=True, figsize=figsize, dpi=80, frameon = False)
+        
+        if len(parameter_indices) == 1:
+               axes = [axes]
+        
+        labels = [k[0] for k in self.loci_stats_sorted]
+        
+        j = 0
+        
+        for ax in axes:
+            
+            values = [k[parameter_indices[j]] for k in self.loci_stats_sorted]
+            
+            bp = ax.boxplot(values,0,'', positions = range(4,(len(values)*4)+1, 4))
+            ax.set_ylabel(ytitles[parameter_indices[j]], fontsize=lable_fsize)
+            #plt.xlabel("Locus", fontsize=lable_fsize)
+            plt.xticks(range(4,((len(values)+1)*4),4), labels, rotation=90, fontsize = xtick_fsize)
+            plt.tight_layout()
+            
+            j += 1
+            
+            remove_border()
+            for box in bp['boxes']:
+            # change outline color
+                box.set( color='salmon', linewidth=1)
+                    
+            # change color, linestyle and linewidth of the whiskers
+            for whisker in bp['whiskers']:
+                whisker.set(color='lightgray', linestyle='solid', linewidth=2.0)
+            
+            # change color and linewidth of the caps
+            for cap in bp['caps']:
+                cap.set(color='gray', linewidth=2.0)
+        
+            # change color and linewidth of the medians
+            for median in bp['medians']:
+                median.set(color='white', linewidth=2)
+            
+        fig.savefig(filename)
+        
+    def slice_loci(self, median_range, otu_meta, parameter='entropy',
+                   otu_must_have_all_of=[], otu_must_have_one_of='any'):
+        
+        j = None
+        if parameter == 'entropy':
+            j = 3
+        elif parameter == 'gapscore':
+            j = 4
+        elif parameter == 'conservation':
+            j = 5
+        elif parameter == 'sequence_length':
+            j = 1
+        elif parameter == 'sequence_gc':
+            j = 2
+        
+        loci_names = [i[0] for i in self.loci_stats_sorted if median_range[0] < np.median(i[j]) < median_range[1]]
+        loci = [l for l in self.loci if l.name in loci_names]
+        concat_name = "%s_%.2f_%.2f_loci_%s_to_%s"%(parameter, float(median_range[0]), float(median_range[1]),
+                                                    loci_names[0],loci_names[-1])
+        
+        return Concatenation(concat_name, loci,
+                             otu_meta,
+                             otu_must_have_all_of=otu_must_have_all_of,
+                             otu_must_have_one_of=otu_must_have_one_of)
+    
+
+    
+    def slide_loci(self, otu_meta, median_range='all', parameter='entropy', start=0, length=2, step=1,
+                   otu_must_have_all_of=[],
+                   otu_must_have_one_of='any'):
+        
+        j = None
+        if parameter == 'entropy':
+            j = 3
+        elif parameter == 'gapscore':
+            j = 4
+        elif parameter == 'conservation':
+            j = 5
+        elif parameter == 'sequence_length':
+            j = 1
+        elif parameter == 'sequence_gc':
+            j = 2
+        
+        if median_range == 'all':
+            medians = [np.median(i) for i in [k[j] for k in self.loci_stats_sorted]]
+            median_range = [min(medians), max(medians)]
+            
+        loci_in_range = [[i[0], np.median(i[j])] for i in self.loci_stats_sorted 
+                          if median_range[0] <= np.median(i[j]) <= median_range[1]]
+        
+        concatenations = []
+        
+        stop = False
+        
+        while not stop:
+            
+            window_loci = loci_in_range[start: start+length]
+                
+            window_loci_names = [n[0] for n in window_loci]
+            loci = [l for l in self.loci if l.name in window_loci_names]
+            window_start_median = window_loci[0][1]
+            window_end_median = window_loci[-1][1]
+            concat_name = "%s_%.2f_%.2f_loci_%i_to_%i"%(parameter, float(window_start_median), float(window_end_median),
+                                                        start+1, start+length+1)
+            print concat_name
+            concatenations.append(Concatenation(concat_name, loci,
+                                                otu_meta,
+                                                otu_must_have_all_of=otu_must_have_all_of,
+                                                otu_must_have_one_of=otu_must_have_one_of))
+            start = start+step
+            
+            if len(loci_in_range[start:]) < length:
+                stop = True
+        
+        return concatenations
 
 if __name__ == "__main__":
     import doctest
