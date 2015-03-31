@@ -2502,7 +2502,8 @@ class Project:
                         t = Tree('RAxML_bipartitions.'+raxml_method.id+'_'+trimmed_alignment+'2')
                     elif raxml_method.preset == 'fd_fJ' or raxml_method.preset == 'fF_fJ':
                         tree_filename = 'RAxML_fastTreeSH_Support.'+raxml_method.id+'_'+trimmed_alignment+'1'
-                        t = Tree(use_sh_support_as_branch_support(tree_filename))
+                        t = Tree(open(tree_filename,'r').read().replace('[','[&&NHX:support='))
+                        
                 elif isinstance(raxml_method, PbConf):
                     base_name = "%s_%s"%(raxml_method.id, trimmed_alignment)
                     trees_file = "%s.1.treelist"%base_name
@@ -5361,7 +5362,7 @@ class LociStats:
             window_start_median = window_loci[0][1]
             window_end_median = window_loci[-1][1]
             concat_name = "%s_%.2f_%.2f_loci_%i_to_%i"%(parameter, float(window_start_median), float(window_end_median),
-                                                        start+1, start+length+1)
+                                                        start, start+length-1)
             print concat_name
             concatenations.append(Concatenation(concat_name, loci,
                                                 otu_meta,
