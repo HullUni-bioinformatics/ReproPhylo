@@ -1367,6 +1367,158 @@ class Project:
         else:
             raise TypeError("Expecting Concatenation object")
 
+    
+    #def make_concatenation_alignments(self):
+        
+        """
+        Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
+        to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
+        following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
+        trimmed alignment will be the Concatenation object name attribute.
+        """
+    #    for s in self.concatenations:
+    #        
+    #        # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
+    #        meta = s.otu_meta
+    #        OTU_list = []
+    #        for record in self.records:
+    #            for feature in record.features:
+    #                if not feature.type == 'source':
+    #                    qualifiers_dictionary = get_qualifiers_dictionary(self,
+    #                                                                      feature.qualifiers['feature_id'])
+    #                    if (meta in qualifiers_dictionary.keys() and
+    #                        not qualifiers_dictionary[meta] in OTU_list):
+    #                        OTU_list.append(qualifiers_dictionary[meta])
+    #                        
+    #        
+    #    
+    #
+    #        included_individuals = {} #included_individuals[otu][locus]=feautre_id
+    #        
+    #        #Get the correct trimmed alignment tokens
+    #        keys_of_trimmed_alignments_to_use_in_concat = []
+    #        for locus in s.loci:
+    #            trimmed_aln = None
+    #            all_locus_trimmed_alns_in_pj = []
+    #            for key in self.trimmed_alignments.keys():
+    #                if locus.name == key.split('@')[0]:
+    #                    all_locus_trimmed_alns_in_pj.append(key)
+    #            if len(all_locus_trimmed_alns_in_pj) == 1:
+    #                trimmed_aln = all_locus_trimmed_alns_in_pj[0]
+    #            elif len(all_locus_trimmed_alns_in_pj) == 0:
+    #                raise RuntimeError('Locus '+locus.name+' have no trimmed alignments')
+    #            else:
+    #                s.define_trimmed_alns.sort(key = lambda i: i.count('@'), reverse=True)
+    #                for definition in s.define_trimmed_alns:
+    #                    if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
+    #                        trimmed_aln = definition
+    #                    elif definition.count('@') == 1 and any([definition in i for i in all_locus_trimmed_alns_in_pj]):
+    #                        trimmed_aln = locus.name+'@'+definition
+    #                    else:
+    #                        raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
+    #                                            locus.name+"' out of "+str(all_locus_trimmed_alns_in_pj))
+    #            if trimmed_aln:
+    #                keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
+    #            else:
+    #                raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
+    #        
+    #        #print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
+    #        
+    #        #if len(included_individuals.keys()) < 4:
+    #        #    raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
+    #        for otu in OTU_list:
+    #            otu_features = {}
+    #            use = True
+    #            
+    #            # Check first rule
+    #            for locus in s.otu_must_have_all_of:
+    #                token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+    #                feature_ids = [r.id for r in self.trimmed_alignments[token]]
+    #                feature_found = False
+    #                count = 0
+    #                for feature_id in feature_ids:
+    #                    qualifiers = get_qualifiers_dictionary(self, feature_id)
+    #                    if meta in qualifiers.keys() and otu == qualifiers[meta]:
+    #                        count += 1
+    #                        feature_found = True
+    #                        otu_features[locus] = feature_id
+    #                if count > 1:
+    #                    raise RuntimeError("%s is not unique in %s"%(otu, locus))
+    #                if not feature_found:
+    #                    use = False
+    #                    
+    #            # Check second rule
+    #            if use:
+    #                for group in s.otu_must_have_one_of:
+    #                    if isinstance(group,str):
+    #                        raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
+    #                    feature_found = False
+    #                    for locus in group:
+    #                        token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
+    #                        feature_ids = [r.id for r in self.trimmed_alignments[token]]
+    #                        count = 0
+    #                        for feature_id in feature_ids:
+    #                            qualifiers = get_qualifiers_dictionary(self, feature_id)
+    #                            if meta in qualifiers.keys() and otu == qualifiers[meta]:
+    #                                count += 1
+    #                                feature_found = True
+    #                                otu_features[locus] = feature_id
+    #                        if count > 1:
+    #                            raise RuntimeError("%s is not unique in %s"%(otu, locus))
+    #                    if not feature_found:
+    #                        use = False
+    #            if use:
+    #                included_individuals[otu] = otu_features
+    #        
+    #        # printing a table of the alignment
+    #        included_indivduals_table = ''
+    #        loci_names = [l.name for l in s.loci]
+    #        line = 'OTU'.ljust(30,' ')
+    #        for name in loci_names:
+    #            line += name.ljust(20,' ')
+    #        included_indivduals_table += line+'\n'
+    #        for otu in included_individuals.keys():
+    #            line = otu.ljust(30,' ')
+    #            for locus_name in loci_names:
+    #                if locus_name in included_individuals[otu].keys():
+    #                    line += included_individuals[otu][locus_name].ljust(15,' ')
+    #                else:
+    #                    line += ''.ljust(15,' ')
+    #            included_indivduals_table += line+'\n'
+    #        print "Concatenation %s will have the following data"%s.name
+    #        print included_indivduals_table
+    #        
+    #        # remove partitions with less then 4 sequences
+    #        for name in loci_names:
+    #            if len([otu for otu in included_individuals.keys() if name in included_individuals[otu].keys()]) < 4:
+    #                print (("Locus %s has less then 4 sequences in concatenation %s and where excluded "+
+    #                                     "from the concatenation")%(name,s.name))
+    #                for key in keys_of_trimmed_alignments_to_use_in_concat:
+    #                    if name in key:
+    #                        keys_of_trimmed_alignments_to_use_in_concat.remove(key)
+    #                        
+    #                                    
+    #        
+    #        # build alignment
+    #        # concat_records = []
+    #        alignment = []
+    #        for individual in included_individuals.keys():
+    #            sequence = ''
+    #            for key in keys_of_trimmed_alignments_to_use_in_concat:
+    #                locus_name = key.split('@')[0]                    
+    #                length = len(self.trimmed_alignments[key][0])
+    #                s.used_trimmed_alns[key] = length
+    #                if locus_name in included_individuals[individual].keys():
+    #                    for record in self.trimmed_alignments[key]:
+    #                        if record.id == included_individuals[individual][locus_name]:
+    #                            sequence += str(record.seq)
+    #                else:
+    #                    sequence += '?'*length
+    #            concat_sequence = SeqRecord(seq = Seq(sequence), id = individual, description = '')
+    #            alignment.append(concat_sequence)
+    #        self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
+    #        s.feature_id_dict = included_individuals    
+
     def make_concatenation_alignments(self):
         
         """
@@ -1375,157 +1527,9 @@ class Project:
         following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
         trimmed alignment will be the Concatenation object name attribute.
         """
-        for s in self.concatenations:
-            
-            # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
-            meta = s.otu_meta
-            OTU_list = []
-            for record in self.records:
-                for feature in record.features:
-                    if not feature.type == 'source':
-                        qualifiers_dictionary = get_qualifiers_dictionary(self,
-                                                                          feature.qualifiers['feature_id'])
-                        if (meta in qualifiers_dictionary.keys() and
-                            not qualifiers_dictionary[meta] in OTU_list):
-                            OTU_list.append(qualifiers_dictionary[meta])
-                            
-            
         
-    
-            included_individuals = {} #included_individuals[otu][locus]=feautre_id
-            
-            #Get the correct trimmed alignment tokens
-            keys_of_trimmed_alignments_to_use_in_concat = []
-            for locus in s.loci:
-                trimmed_aln = None
-                all_locus_trimmed_alns_in_pj = []
-                for key in self.trimmed_alignments.keys():
-                    if locus.name == key.split('@')[0]:
-                        all_locus_trimmed_alns_in_pj.append(key)
-                if len(all_locus_trimmed_alns_in_pj) == 1:
-                    trimmed_aln = all_locus_trimmed_alns_in_pj[0]
-                elif len(all_locus_trimmed_alns_in_pj) == 0:
-                    raise RuntimeError('Locus '+locus.name+' have no trimmed alignments')
-                else:
-                    s.define_trimmed_alns.sort(key = lambda i: i.count('@'), reverse=True)
-                    for definition in s.define_trimmed_alns:
-                        if definition.count('@') == 2 and locus.name == definition.split('@')[0]:
-                            trimmed_aln = definition
-                        elif definition.count('@') == 1 and any([definition in i for i in all_locus_trimmed_alns_in_pj]):
-                            trimmed_aln = locus.name+'@'+definition
-                        else:
-                            raise RuntimeError("Could not determine which alignment/trimming alternative to use for locus '"+
-                                                locus.name+"' out of "+str(all_locus_trimmed_alns_in_pj))
-                if trimmed_aln:
-                    keys_of_trimmed_alignments_to_use_in_concat.append(trimmed_aln)
-                else:
-                    raise RuntimeError('Could not find trimmed aln for locus '+locus.name+' given the rulls '+str(s.define_trimmed_alns))
-            
-            #print "%i individuals will be included in the concatenations %s"%(len(included_individuals.keys()), s.name)
-            
-            #if len(included_individuals.keys()) < 4:
-            #    raise RuntimeError("Concatenation %s has less than 4 OTUs and cannot be analyzed"%s.name)
-            for otu in OTU_list:
-                otu_features = {}
-                use = True
-                
-                # Check first rule
-                for locus in s.otu_must_have_all_of:
-                    token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
-                    feature_ids = [r.id for r in self.trimmed_alignments[token]]
-                    feature_found = False
-                    count = 0
-                    for feature_id in feature_ids:
-                        qualifiers = get_qualifiers_dictionary(self, feature_id)
-                        if meta in qualifiers.keys() and otu == qualifiers[meta]:
-                            count += 1
-                            feature_found = True
-                            otu_features[locus] = feature_id
-                    if count > 1:
-                        raise RuntimeError("%s is not unique in %s"%(otu, locus))
-                    if not feature_found:
-                        use = False
-                        
-                # Check second rule
-                if use:
-                    for group in s.otu_must_have_one_of:
-                        if isinstance(group,str):
-                            raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
-                        feature_found = False
-                        for locus in group:
-                            token = [t for t in keys_of_trimmed_alignments_to_use_in_concat if "%s@"%locus in t][0]
-                            feature_ids = [r.id for r in self.trimmed_alignments[token]]
-                            count = 0
-                            for feature_id in feature_ids:
-                                qualifiers = get_qualifiers_dictionary(self, feature_id)
-                                if meta in qualifiers.keys() and otu == qualifiers[meta]:
-                                    count += 1
-                                    feature_found = True
-                                    otu_features[locus] = feature_id
-                            if count > 1:
-                                raise RuntimeError("%s is not unique in %s"%(otu, locus))
-                        if not feature_found:
-                            use = False
-                if use:
-                    included_individuals[otu] = otu_features
-            
-            # printing a table of the alignment
-            included_indivduals_table = ''
-            loci_names = [l.name for l in s.loci]
-            line = 'OTU'.ljust(30,' ')
-            for name in loci_names:
-                line += name.ljust(20,' ')
-            included_indivduals_table += line+'\n'
-            for otu in included_individuals.keys():
-                line = otu.ljust(30,' ')
-                for locus_name in loci_names:
-                    if locus_name in included_individuals[otu].keys():
-                        line += included_individuals[otu][locus_name].ljust(15,' ')
-                    else:
-                        line += ''.ljust(15,' ')
-                included_indivduals_table += line+'\n'
-            print "Concatenation %s will have the following data"%s.name
-            print included_indivduals_table
-            
-            # remove partitions with less then 4 sequences
-            for name in loci_names:
-                if len([otu for otu in included_individuals.keys() if name in included_individuals[otu].keys()]) < 4:
-                    print (("Locus %s has less then 4 sequences in concatenation %s and where excluded "+
-                                         "from the concatenation")%(name,s.name))
-                    for key in keys_of_trimmed_alignments_to_use_in_concat:
-                        if name in key:
-                            keys_of_trimmed_alignments_to_use_in_concat.remove(key)
-                            
-                                        
-            
-            # build alignment
-            # concat_records = []
-            alignment = []
-            for individual in included_individuals.keys():
-                sequence = ''
-                for key in keys_of_trimmed_alignments_to_use_in_concat:
-                    locus_name = key.split('@')[0]                    
-                    length = len(self.trimmed_alignments[key][0])
-                    s.used_trimmed_alns[key] = length
-                    if locus_name in included_individuals[individual].keys():
-                        for record in self.trimmed_alignments[key]:
-                            if record.id == included_individuals[individual][locus_name]:
-                                sequence += str(record.seq)
-                    else:
-                        sequence += '?'*length
-                concat_sequence = SeqRecord(seq = Seq(sequence), id = individual, description = '')
-                alignment.append(concat_sequence)
-            self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
-            s.feature_id_dict = included_individuals    
-
-    def __make_concatenation_alignments__(self):
+        self.__records_list_to_dict__()
         
-        """
-        Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
-        to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
-        following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
-        trimmed alignment will be the Concatenation object name attribute.
-        """
         for s in self.concatenations:
             
             # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
@@ -1668,7 +1672,9 @@ class Project:
                 alignment.append(concat_sequence)
             self.trimmed_alignments[s.name] = MultipleSeqAlignment(alignment)                
             s.feature_id_dict = included_individuals 
-
+    
+        self._records_dict = {}
+        
     ###################################################
     # Project methods for modifying feature qualifiers
     ###################################################
