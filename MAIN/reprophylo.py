@@ -64,130 +64,6 @@ import __builtin__
 
 
 
-##############################################################################################
-if False:
-    """Tools for loci explorations in a GenBank File"""
-##############################################################################################
-
-programspath = ""
-
-def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None):
-    
-   """
-   Takes a genbank file, returns a loci csv file and a list of loci and their counts. The latter goes
-   either to stdout or to a file.
-    
-   >>> list_loci_in_genbank("test-data/test.gb", "test-data/temp_loci.csv", loci_report = "test-data/temp_loci.txt")
-   >>> assert open("test-data/temp_loci.csv",'r').read() == open("test-data/test_loci.csv",'r').read() 
-   >>> import os
-   >>> os.remove("test-data/temp_loci.csv")
-   """
-    
-   stdout = sys.stdout
-   if  loci_report: 
-        sys.stdout = open(loci_report, 'w')
-    
-   genbank_synonyms = gb_syn.gb_syn()
-    
-   # Open GenBank file
-   MelPCgenes = open(genbank_filename, 'rU')
-   
-   gene_dict = {} #set up a gene_dict dictionary
-   
-   # For each record
-   for record in SeqIO.parse(MelPCgenes, 'genbank') :
-   
-      # Grab the entire sequence
-      #seq = str(record.seq)  ## what is this actually used for? Nothing seems to happen on disabling it
-   
-      # Look at all features for this record
-      for feature in record.features:
-         
-         # If it's a CDS or rRNA...
-         if feature.type == 'CDS' or feature.type == 'rRNA':
-   
-            # If it contains some attribute called 'gene' save that
-            if 'gene' in feature.qualifiers:
-               geneName = feature.qualifiers['gene'][0]
-               geneName.replace(',','_')
-               geneName.replace('/','_')
-               if feature.type+','+geneName in gene_dict:
-                   gene_dict[feature.type+','+geneName]+=1
-               else:    
-                   gene_dict[feature.type+','+geneName]=1
-               #print(geneName)
-               
-            # Else if it contains some attribute called 'product' save that instead
-            elif 'product' in feature.qualifiers:
-               geneName = feature.qualifiers['product'][0]
-               geneName.replace(',','_')
-               geneName.replace('/','_')
-               if feature.type+','+geneName in gene_dict:
-                   gene_dict[feature.type+','+geneName]+=1
-               else:    
-                   gene_dict[feature.type+','+geneName]=1
-               #print(geneName)
-               
-            # Otherwise, quit.
-            else:
-               print 'ERROR when parsing feature: could not find either gene or product in '+record.id
-               #print feature.qualifiers
-               #quit()
-   #print(gene_dict)
-       
-   #sorting happens via a list
-   
-   sorted_gene_names = gene_dict.items()
-   sorted_gene_names.sort(key = lambda i: i[0].lower())
-   control_file_lines = {}
-   
-   
-   print('\n' + "There are " + str(len(sorted_gene_names)) + " gene names (or gene product names) detected")
-   print("----------------------------------")
-   print("Gene and count sorted by gene name")
-   print("----------------------------------")
-   
-   for key, value in sorted_gene_names:
-           #print key, value
-           print(str(value) +" instances of " + key)
-           feature_type = key.split(',')[0]
-           alias = key.split(',')[1]
-           gen_group = None
-           for group in genbank_synonyms:
-               if alias in group:
-                   gen_group = group
-           if gen_group:
-               if gen_group[0].replace(' ','_') in control_file_lines.keys():
-                   control_file_lines[gen_group[0].replace(' ','_')].append(alias)
-               else:
-                   control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, alias]
-           else:
-               name = alias.replace(' ','_').replace('/','_')
-               control_file_lines[name] = [feature_type, alias]
-                    
-   control_file_handle = open(control_filename, 'wt')
-   for line in sort(control_file_lines.keys()):  
-       control_file_handle.write('dna,%s,%s'%(control_file_lines[line][0],line))
-       for a in control_file_lines[line][1:]: 
-          control_file_handle.write(',%s'%a)
-       control_file_handle.write('\n')
-                            
-   control_file_handle.close()                 
-   
-   print("-------------------------------")
-   print("Gene and count sorted by counts")
-   print("-------------------------------")
-   sorted_gene_names.sort(key = lambda i: int(i[1]), reverse=True)
-   for key, value in sorted_gene_names:
-           #print key, value
-           print(str(value) +" instances of " + key)
-   sys.stdout = stdout
-   
-                    
-                    
-
-
-
 
 ##############################################################################################
 class Locus:
@@ -745,11 +621,17 @@ def global_aln_stats(aln_obj):
     mean_gap_prop = sum(prop_list)/aln_obj.get_alignment_length()
     return (mean_gap_prop, non_uniform_count, parsimony_informative)
 
-def count_undetermined_lines(aln_obj):
+def count_undetermined_lines(aln_obj, cutoff=0):
     count = 0
     ids = []
+    
+    if aln_obj.get_alignment_length() < cutoff*2:
+        warnings.warn('The cutoff to exclude a sequence is more than half of the alignmnet length')
+    elif aln_obj.get_alignment_length() <= cutoff:
+        raise RuntimeWarning('The cutoff to exclude a sequence is as long or longer than the alignment')
+    
     for seq in aln_obj:
-        if str(seq.seq).count('-') == aln_obj.get_alignment_length():
+        if str(seq.seq).count('-') >= aln_obj.get_alignment_length()-cutoff:
             count += 1
             ids.append(seq.id)
     return count, ids
@@ -764,15 +646,16 @@ def count_collapsed_aln_seqs(aln_obj):
         seen_seqs.append(str_seq)
     return count
 
-def aln_summary(aln_obj):
+def aln_summary(aln_obj, cutoff=0):
     lines = ["Alignment length: %i" % aln_obj.get_alignment_length(),
              "Number of rows: %i" % len(aln_obj),
              "Unique sequences: %i"%count_collapsed_aln_seqs(aln_obj),
              "Average gap prop.: %f\nVariable columns: %i\nParsimony informative: %i"
              %global_aln_stats(aln_obj),
-             "Undetermined sequences: %i"%(count_undetermined_lines(aln_obj)[0])
+             "Undetermined sequences: %i"%(count_undetermined_lines(aln_obj, cutoff=cutoff)[0]),
+             "Undetermined sequence cutoff: %i"%cutoff
              ]
-    return [lines, len(aln_obj), count_undetermined_lines(aln_obj), count_collapsed_aln_seqs(aln_obj)]        
+    return [lines, len(aln_obj), count_undetermined_lines(aln_obj, cutoff=cutoff), count_collapsed_aln_seqs(aln_obj)]        
             
 
 def loci_list_from_csv(loci):
@@ -1409,12 +1292,12 @@ class Project:
     
     #def make_concatenation_alignments(self):
         
-        """
-        Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
-        to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
-        following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
-        trimmed alignment will be the Concatenation object name attribute.
-        """
+    #    """
+    #    Concatenates a trimmed alignment based on each of the Concatenation objects and adds them
+    #    to the pj.trimmed_alignments dictionary. While a trimmed alignment of an individual locus will have a key
+    #    following the patten "locus_name@alignment_method_name@trimming_method_name, the key for a concatenated
+    #    trimmed alignment will be the Concatenation object name attribute.
+    #    """
     #    for s in self.concatenations:
     #        
     #        # get a non-redundant list of OTUs stored in 'meta', such as voucher specimen
@@ -1981,7 +1864,7 @@ class Project:
                     source = feature
             value = None
             if not source == None:
-              if qualifier in source.qualifiers.keys():
+                if qualifier in source.qualifiers.keys():
                     value = source.qualifiers[qualifier]       
             if not value == None:
                 if not type(value) is list:
@@ -2373,16 +2256,16 @@ class Project:
         title_length = max([len(r.id) for r in records])+2
         
         # colors
-        dna_colors = {'a':'MediumSeaGreen',
-                      'A':'MediumSeaGreen',
-                      'T':'Salmon',
-                      't':'Salmon',
-                      'U':'Salmon',
-                      'u':'Salmon',
-                      'g':'lightgray',
-                      'G':'lightgray',
-                      'c':'Teal',
-                      'C':'Teal'
+        dna_colors = {'a':'green',
+                      'A':'green',
+                      'T':'red',
+                      't':'red',
+                      'U':'red',
+                      'u':'red',
+                      'g':'gray',
+                      'G':'gray',
+                      'c':'blue',
+                      'C':'blue'
                       }
         protein_colors = {'R':'blueviolet',
                           'r':'blueviolet',
@@ -2511,7 +2394,7 @@ class Project:
                     # find the number of chains
                     nchains = raxml_method.cline_args['nchain'].split()[0]
                     chain_names = ''
-                    for i in range(1,nchains+1):
+                    for i in range(1,str(nchains)+1):
                         chain_names += "%s.%i "%(base_name, i)
                     chain_names = chain_names[:-1]
                     bpcomp_cline = "%s -c %f -x %i %i %s"%(bpcomp,
@@ -2520,7 +2403,7 @@ class Project:
                                                            int(bpcomp_step),
                                                            chain_names)
                     sub.call(bpcomp_cline, shell=True)
-                    t = Tree("tracecomp.con.tre")
+                    t = Tree("bpcomp.con.tre")
                     for l in t:
                         l.support = 0
                     
@@ -2821,7 +2704,7 @@ class Project:
             sys.stdout = stdout
      
             
-    def trim(self, list_of_Conf_objects):
+    def trim(self, list_of_Conf_objects, cutoff=0):
         for m in list_of_Conf_objects:
             m.timeit.append(time.time())
             m.platform = platform_report() 
@@ -2839,7 +2722,8 @@ class Project:
                         if locus.name == locus_name and locus.char_type == 'prot':
                             alphabet = IUPAC.protein
                     align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=alphabet)
-                    [summary_lines, num_lines, num_undeter, num_collapsed_aln_seqs] = aln_summary(align)
+                    [summary_lines, num_lines, num_undeter, num_collapsed_aln_seqs] = aln_summary(align,
+                                                                                                  cutoff=cutoff)
                     summary = 'Alignment name: '+aln+'\n'
                     for line in summary_lines:
                         summary += line+'\n'
@@ -2848,7 +2732,7 @@ class Project:
                         print line
                         summary += line+'\n'
                     elif num_undeter[0] > 0:
-                        line = 'Alignment %s has undetermined sequences which will be dropped: %s'%(aln,num_undeter[1])
+                        line = 'Alignment %s has undetermined sequences (%i bp or less) which will be dropped: %s'%(aln, cutoff+1, num_undeter[1])
                         print line
                         summary += line+'\n'
                         records_wo_undeter = []
@@ -3026,7 +2910,123 @@ class Project:
                 for i in feature_qualifiers:
                     l.add_feature(i,type_to_single_line_str(feature_qualifiers[i]))
             self.trees[t][1] = self.trees[t][0].write(features=[])
-                
+
+            
+##############################################################################################
+if False:
+    """Tools for loci explorations in a GenBank File"""
+##############################################################################################
+
+programspath = ""
+
+def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None):
+    """
+    Takes a genbank file, returns a loci csv file and a list of loci and their counts. The latter goes
+    either to stdout or to a file.
+    
+    >>> list_loci_in_genbank("test-data/test.gb", "test-data/temp_loci.csv", loci_report = "test-data/temp_loci.txt")
+    >>> assert open("test-data/temp_loci.csv",'r').read() == open("test-data/test_loci.csv",'r').read() 
+    >>> import os
+    >>> os.remove("test-data/temp_loci.csv")
+    """
+    
+    stdout = sys.stdout
+    if  loci_report: 
+        sys.stdout = open(loci_report, 'w')
+    
+    genbank_synonyms = gb_syn.gb_syn()
+    
+    # Open GenBank file
+    MelPCgenes = open(genbank_filename, 'rU')
+   
+    gene_dict = {} #set up a gene_dict dictionary
+   
+    # For each record
+    
+    for record in SeqIO.parse(MelPCgenes, 'genbank') :
+        # Look at all features for this record
+        for feature in record.features:
+         
+            # If it's a CDS or rRNA...
+            if feature.type == 'CDS' or feature.type == 'rRNA':
+                # If it contains some attribute called 'gene' save that
+                if 'gene' in feature.qualifiers:
+                    geneName = feature.qualifiers['gene'][0]
+                    geneName = geneName.replace(',','_')
+                    geneName = geneName.replace('/','_')
+
+                    if feature.type+','+geneName in gene_dict:
+                        gene_dict[feature.type+','+geneName]+=1
+                    else:    
+                        gene_dict[feature.type+','+geneName]=1
+                    #print(geneName)
+
+                # Else if it contains a 'product' qualifier
+                elif 'product' in feature.qualifiers:
+                    geneName = feature.qualifiers['product'][0]
+                    geneName = geneName.replace(',','_')
+                    geneName = geneName.replace('/','_') 
+
+                    if feature.type+','+geneName in gene_dict:
+                        gene_dict[feature.type+','+geneName]+=1
+                    else:    
+                        gene_dict[feature.type+','+geneName]=1
+                    #print(geneName)
+
+                else:
+                    print 'Could not find either gene or product in '+record.id
+                    #print feature.qualifiers
+
+       
+    #sorting happens via a list
+   
+    sorted_gene_names = gene_dict.items()
+    sorted_gene_names.sort(key = lambda i: i[0].lower())
+    control_file_lines = {}
+   
+   
+    print('\n' + "There are " + str(len(sorted_gene_names)) + " gene names (or gene product names) detected")
+    print("----------------------------------")
+    print("Gene and count sorted by gene name")
+    print("----------------------------------")
+   
+    for key, value in sorted_gene_names:
+        #print key, value
+        print(str(value) +" instances of " + key)
+        feature_type = key.split(',')[0]
+        alias = key.split(',')[1]
+        gen_group = None
+        for group in genbank_synonyms:
+            if alias in group:
+                gen_group = group
+        if gen_group:
+            if gen_group[0].replace(' ','_') in control_file_lines.keys():
+                control_file_lines[gen_group[0].replace(' ','_')].append(alias)
+            else:
+                control_file_lines[gen_group[0].replace(' ','_')] = [feature_type, alias]
+        else:
+            name = alias.replace(' ','_').replace('/','_')
+            control_file_lines[name] = [feature_type, alias]
+                    
+    control_file_handle = open(control_filename, 'wt')
+    for line in sort(control_file_lines.keys()):  
+        control_file_handle.write('dna,%s,%s'%(control_file_lines[line][0],line))
+        for a in control_file_lines[line][1:]: 
+            control_file_handle.write(',%s'%a)
+        control_file_handle.write('\n')
+                            
+    control_file_handle.close()                 
+   
+    print("-------------------------------")
+    print("Gene and count sorted by counts")
+    print("-------------------------------")
+    sorted_gene_names.sort(key = lambda i: int(i[1]), reverse=True)
+    for key, value in sorted_gene_names:
+        #print key, value
+        print(str(value) +" instances of " + key)
+    sys.stdout = stdout
+    return    
+
 ##############################################################################################
 class AlnConf:
 ##############################################################################################
@@ -3267,8 +3267,7 @@ def use_sh_support_as_branch_support(tree_filename):
     string = re.sub(r'\[',r'[&&NHX:support=',string)
     t = Tree(string)
     t.dist=0
-    t.write(features=[])
-    #t.show()
+    return t.write(features=[])
     
 def transfer_support_same_topo(tree_file_with_support,
                                tree_file_without_support):
@@ -3548,8 +3547,9 @@ def write_pb_cline(conf_obj, pj, trimmed_alignment):
     cline += " %s_%s"%(conf_obj.id, trimmed_alignment)
     return cline
             
-
+###################################################################################################
 class PbConf:
+###################################################################################################
     
     def __init__(self, pj, method_name = 'dna_cat_gtr', program_name='phylobayes', keepfiles=True,
                  cmd='default', alns='all', cline_args=dict(nchain="2 100 0.1 100",
@@ -4042,8 +4042,9 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
                               'GapProp=Average gap proportion\n'+
                               'VarCols=Total variable positions\n'+
                               'ParsInf=Parsimony informative positions\n'+
-                              'UnSeqs=Completely undetermined sequences (only gaps)\n</pre>')]
-            T = [['Name','NumPos','NumSeq','Unique','GapProp','VarCols','ParsInf','UnSeqs']]
+                              'UnSeqs=Undetermined sequences (mostly/only gaps)\n'+
+                              'UnSeqsCutoff=Length cutoff which defines undetermined\n</pre>')]
+            T = [['Name','NumPos','NumSeq','Unique','GapProp','VarCols','ParsInf','UnSeqs','UnSeqsCutoff']]
             comments = []
             for summary in pj.aln_summaries:
                 line = []
