@@ -327,6 +327,7 @@ def keep_feature(feature, loci):
         return True
     else:
         return False
+    return
   
 
 
@@ -720,6 +721,13 @@ def parse_paup_charset(nexus_filename):
     charset locus_name = 1 - 129 ;
     """
     
+    try:
+        AlignIO.read(nexus_filename, 'nexus')
+    except:
+        n = len(list(AlignIO.parse(nexus_filename, 'nexus')))
+        raise IOError('Cannot handle more then one matrix in %s. Got %i matrices'%
+                     (nexus_filename, n))
+    
     charsets = {}
     charset_lines = [l for l in open(nexus_filename,'r').readlines() if 
                      (l.startswith('CHARSET') or l.startswith('charset'))]
@@ -820,7 +828,7 @@ class Project:
         self.alignments = {}
         self.trimmed_alignments = {}
         self.trees = {}
-        self.used_methods = []
+        self.used_methods = {}
         self.sets = {}
         
 
@@ -832,7 +840,10 @@ class Project:
                          'bpcomp': programspath+'bpcomp',
                          'tracecomp': programspath+'tracecomp',
                          'fasttree': programspath+'FastTreeMP',
-                         'pal2nal': programspath+'pal2nal.pl'}
+                         'pal2nal': programspath+'pal2nal.pl',
+                         # PROGRAM PLUG
+                         # 'program name': programpath+'the basic command'
+                        }
     
         seen = []
         if isinstance(loci,list):
@@ -2110,19 +2121,56 @@ class Project:
                 method.timeit.append(time.time())
                 method.platform = platform_report()
                 if method.program_name == 'muscle':
-                    method.platform.append('Program and version: '+os.popen(method.cmd + ' -version').read())
+                    method.platform.append('Program and version: '+
+                                           os.popen(method.cmd + ' -version').read().split(' by')[0])
+                    method.platform.append('Program reference:\nEdgar 2004: MUSCLE: multiple sequence '+
+                                           'alignment with high accuracy and high throughput. '+
+                                           'Nucleic Acids Research 32(5):1792-1797')
                 elif method.program_name == 'mafft':
                     p = sub.Popen(method.cmd+" --version", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
-                    method.platform.append('Program and version: '+p.communicate()[1].splitlines()[3])
+                    method.platform.append('Program and version: '+
+                                           p.communicate()[1].splitlines()[3].strip().split(' (')[0])
+                    method.platform.append('Program reference:Katoh, Standley 2013 (Molecular Biology and Evolution 30:772-780) '+
+                                           'MAFFT multiple sequence alignment software version 7: improvements in performance and usability.')
+                
+                
+                
+                # PROGRAM PLUG
+                # NOTE: THIS ADDS THE PROGRAM AND REFERENCE INFO TO THE CONF OBJECT
+                #
+                # elif method.program_name == 'the name of the program':
+                #    p = sub.Popen(method.cmd+" command that writes version", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
+                #    method.platform.append('Program and version: '+
+                #                           # 1 for stderr, 0 for stdout
+                #                           p.communicate()[1].splitlines()[# get the line and split])
+                #    method.platform.append('Program reference: write the reference here')
+                
+                
+                if  method.CDSAlign:
+                    p = sub.Popen('pal2nal.pl', shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
+                    method.platform[-2] += '\nPal2Nal '+ p.communicate()[1].splitlines()[1].split('(')[1].split(')')[0]
+                    method.platform[-1] += ['\nMikita Suyama, David Torrents, and Peer Bork (2006) PAL2NAL: robust '+ 
+                                            'conversion of protein sequence alignments into the corresponding codon '+
+                                            'alignments.Nucleic Acids Res. 34, W609-W612.'][0]
                 for locus in method.loci:
                     if locus.name in seen_loci:
+                        # Uncomment this to restrict each locus to one Conf object
                         #raise RuntimeError('locus '+locus.name+' is in more than one AlnConf objects')
                         pass
                     else:
                         seen_loci.append(locus.name)
+                        
+                    # This will put a fasta alignment in stdout    
                     stdout, stderr = method.command_lines[locus.name]()
+                    
+                    # This will make a MultipleSeqAlignment from the fasta alignment
                     align = AlignIO.read(StringIO(stdout), "fasta",  alphabet=IUPAC.protein)
+                    
+                    # This will run pal2nal
                     if method.CDSAlign and locus.feature_type == 'CDS' and locus.char_type == 'dna':
+                        
+                        # These will check the protein alignment have the same otus and 
+                        # the sequences are the same length
                         for seq in align:
                             found = 0
                             for s in method.CDS_in_frame[locus.name]:
@@ -2146,15 +2194,29 @@ class Project:
                                             i += 1
                                     if not i*3 == len(seq.seq):
                                         raise RuntimeError('nuc and prot seqs have unmatched lengths for '+seq.id)
+                                        
+                        # This will write an input protein alignment file for pal2nal
                         aln_filename = method.id+'_'+locus.name+'.aln'
                         AlignIO.write(align, aln_filename, 'fasta')
+                        
+                        # This will run pal2nal
                         cds_filename = method.id+'_CDS_in_frame_'+locus.name+'.fasta'
                         stdout = os.popen(pal2nal+' '+aln_filename+' '+cds_filename + ' -nostderr -codontable %i'%method.codontable).read()
+                        
+                        # This will make a MultipleSeqAlignment out of the pal2nal output
                         align = AlignIO.read(StringIO(stdout), "clustal",  alphabet=IUPAC.ambiguous_dna)
+                        
+                        # Maybe this will replace pal2nal
                         #from Bio import CodonAlign
                         #codon_aln = CodonAlign.build(align, method.CDS_in_frame[locus.name])
                         #align = codon_aln
+                        
+                    # This will list all the temp files written during the analysis
                     method_files = glob.glob(method.id+'_*')
+                    
+                    # This will get summary statistics of the alignment,
+                    # will remove alignments with less than four unique sequences
+                    # and will remove undetermined sequences.
                     [summary_lines, num_lines, num_undeter, num_collapsed_aln_seqs] = aln_summary(align)
                     summary = 'Alignment name: '+locus.name+'@'+method.method_name+'\n'
                     for line in summary_lines:
@@ -2173,13 +2235,18 @@ class Project:
                         summary += line+'\n'
                         
                     else:
+                        # This will palce the MultipleSeqAlignment in the Project
                         self.alignments[locus.name+'@'+method.method_name] = align
                     self.aln_summaries.append(summary)
+                    
+                # This will measure the running time    
                 method.timeit.append(time.time())
                 method.timeit.append(method.timeit[2]-method.timeit[1])
+                
+                # This will delete the temp files
                 for f in method_files:
                     os.remove(f)
-            self.used_methods += alignment_methods
+                self.used_methods[method.method_name] = method
 
 
 
@@ -2355,7 +2422,6 @@ class Project:
         
     
     def tree(self, raxml_methods, bpcomp='default', bpcomp_burnin=0.2, bpcomp_step=10, bpcomp_cutoff=0.01):
-        # to do: determine the program used and the resulting expected tree file name
         
         if bpcomp == 'default':
             bpcomp = self.defaults['bpcomp']
@@ -2364,17 +2430,43 @@ class Project:
             raxml_method.timeit.append(time.time())
             raxml_method.platform = platform_report()
             if isinstance(raxml_method, RaxmlConf):
-                raxml_method.platform.append('Program and version: '+ raxml_method.cmd + ': ' +
-                                             os.popen(raxml_method.cmd + ' -version').readlines()[2])
+                raxml_method.platform.append('Program and version: '+ raxml_method.cmd +
+                                             os.popen(raxml_method.cmd + ' -version').readlines()[2].split('This is ')[1].split(' released')[0])
+                raxml_method.platform.append('Program reference: '+
+                                             'A. Stamatakis: "RAxML Version 8: A tool for Phylogenetic Analysis '+
+                                             'and Post-Analysis of Large Phylogenies". In Bioinformatics, 2014.')
             elif isinstance(raxml_method, PbConf):
                 p = sub.Popen(raxml_method.cmd+" -v", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
                 raxml_method.platform.append('Program and version: '+p.communicate()[1].splitlines()[-1])
+                raxml_method.platform.append('Program reference: '
+                                             'N. Lartillot, T. Lepage and S. Blanquart, 2009: PhyloBayes 3: '+
+                                             'a Bayesian software package for phylogenetic reconstruction and '+
+                                             'molecular dating. Bioinformatics Vol. 25 no. 17.')
+            # PROGRAM PLUG
+            # NOTE: THIS METHOD SERVES ALL PHYLO PROGRAMS ALTHOUGH THE ITERATOR IS 
+            # CALLED raxml_method
+            # THIS GETS THE VERSION AND REFERENCE OF THE PROGRAM
+            
+            # elif isinstance(raxml_method, Conf object name):
+            #    p = sub.Popen(raxml_method.cmd+" command that writes version", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
+            #    raxml_method.platform.append('Program and version: '+
+            #                           # 1 for stderr, 0 for stdout
+            #                           p.communicate()[1].splitlines()[# get the line and split])
+            #    raxml_method.platform.append('Program reference: write the reference here')
+                
             for trimmed_alignment in raxml_method.command_lines.keys():
                 for cline in raxml_method.command_lines[trimmed_alignment]:
                     if isinstance(raxml_method, RaxmlConf):
                         stdout, stderr = cline()
                     elif isinstance(raxml_method, PbConf):
                         sub.call(cline, shell=True)
+                        
+                    # PROGRAM PLUG
+                    # THIS RUNS THE PROGRAM
+                    # elif isinstance(raxml_method, Conf Object Name):
+                    #     sub.call(cline, shell=True)
+                    
+                    
                 t = None
                 if isinstance(raxml_method, RaxmlConf):
                     if raxml_method.preset == 'fa':
@@ -2406,14 +2498,27 @@ class Project:
                     t = Tree("bpcomp.con.tre")
                     for l in t:
                         l.support = 0
+                        
+                # PROGRAM PLUG
+                # NOTE: THIS IS SIMPLIFIED. MIGHT WORK WITH SOMETHING LIKE
+                # FASTTREE. SEE MORE EXAMPLES ABOVE
+                # THIS SECTION MAKES A Tree OBJECT OUT OF THE OUTPUT FILE
+                
+                # elif isinstance(raxml_method, Conf object name):
+                #    base_name = "%s_%s"%(raxml_method.id, trimmed_alignment)
+                #    tree_file = "the form of the output file with the %s"%base_name
+                #    t = Tree(tree_file)
                     
             
+                # This puts the Conf id in the tree 
                 for n in t.traverse():
                     n.add_feature('tree_method_id', str(raxml_method.id)+'_'+trimmed_alignment)
                 t.dist = 0
                 t.add_feature('tree_method_id', str(raxml_method.id)+'_'+trimmed_alignment)
                 
-           
+                
+                # This gets all the metadta from pj.records and puts it
+                # on the tree leaves
                 loci_names = [i.name for i in  self.loci]       
                 concat_names = [c.name for c in self.concatenations]
                 if trimmed_alignment.partition('@')[0] in loci_names:
@@ -2441,9 +2546,14 @@ class Project:
                                 leaf.add_feature(f_qual, feature.qualifiers[f_qual][0])
                         for l in t:
                             t.add_feature('tree_id', trimmed_alignment+'@'+raxml_method.method_name)
+                            
+                        # This puts a Tree object and a string representation of the tree
+                        # in the project
                         self.trees[trimmed_alignment+'@'+raxml_method.method_name] = [t,t.write(features=[])]
                         
                 elif trimmed_alignment in concat_names:
+                        # This does the same as above, but instead of dealing with gene trees
+                        # it deals with supermatrix trees
                         s = filter(lambda i: i.name == trimmed_alignment, self.concatenations)[0]
                         for leaf in t:
                             records = self.records
@@ -2460,13 +2570,17 @@ class Project:
                         for l in t:
                             t.add_feature('tree_id', s.name+'@mixed@mixed@'+raxml_method.method_name)
                         self.trees[s.name+'@mixed@mixed@'+raxml_method.method_name] = [t,t.write(features=[])]
+                        
+            # This times the analysis            
             raxml_method.timeit.append(time.time())
             raxml_method.timeit.append(raxml_method.timeit[2]-raxml_method.timeit[1])
+            
+            # This deletes temp files
             if not raxml_method.keepfiles:
                 for file_name in os.listdir(os.curdir):
                             if raxml_method.id.partition('_')[0] in file_name:
                                 os.remove(file_name)
-        self.used_methods += raxml_methods
+            self.used_methods[raxml_method.method_name] = raxml_method
 
 
 
@@ -2541,16 +2655,26 @@ class Project:
                  leaf_labels_txt_meta,
                  leaf_node_color_meta=None,
                  leaf_label_colors=None,
+                 ftype='Verdana',
+                 fsize=10,
     
                  node_bg_meta=None,
                  node_bg_color=None,
                  
                  node_support_dict=None,
+                 support_bullet_size=5,
                  
                  heat_map_meta = None, #list
                  heat_map_colour_scheme=2,
                  
+                 pic_meta=None,
+                 pic_paths=None,
+                 pic_w=None,
+                 pic_h=None,
+                 
                  multifurc=None,
+                 branch_width=2,
+                 branch_color='DimGray',
                  
                  scale = 1000,
                  
@@ -2594,7 +2718,7 @@ class Project:
                         for colour_name in leaf_label_colors.keys():
                             if colour_name in qualifiers_dictionary[leaf_node_color_meta]:
                                 fgcolor = leaf_label_colors[colour_name]
-                    leaf_face = TextFace(leaf_label, fgcolor=fgcolor)
+                    leaf_face = TextFace(leaf_label, fgcolor=fgcolor, ftype=ftype, fsize=fsize)
                     leaf.add_face(leaf_face,0)
                     if not root_value == 'mid' and root_meta in qualifiers_dictionary.keys() and root_value in qualifiers_dictionary[root_meta]:
                         outgroup_list.append(leaf)
@@ -2615,6 +2739,11 @@ class Project:
                             leaf.add_features(profile=profile)
                             leaf.add_features(deviation=deviation)
                             leaves_for_heatmap.append(leaf)
+                    if pic_meta:
+                        leaf_value = qualifiers_dictionary[pic_meta]
+                        if leaf_value in pic_paths:
+                            pic_face = ImgFace(pic_paths[leaf_value], width=pic_w, height=pic_h)
+                            leaf.add_face(pic_face, 1)
                 for leaf in leaves_for_heatmap:
                     leaf.add_face(ProfileFace(max_v=float(max(all_heatmap_profile_values)),
                                               min_v=float(min(all_heatmap_profile_values)), 
@@ -2659,10 +2788,10 @@ class Project:
                 ns = NodeStyle()
                 ns['size'] = 0
                 ns['fgcolor'] = 'black'
-                ns['vt_line_width'] = 2
-                ns['hz_line_width'] = 2
-                ns['hz_line_color'] = 'DimGray'
-                ns['vt_line_color'] = 'DimGray'
+                ns['vt_line_width'] = branch_width
+                ns['hz_line_width'] = branch_width
+                ns['hz_line_color'] = branch_color
+                ns['vt_line_color'] = branch_color
                 for n in self.trees[tree][0].traverse():
                     n.set_style(ns)
                 self.trees[tree][0].set_style(ns)
@@ -2679,10 +2808,10 @@ class Project:
                             ns = NodeStyle(bgcolor=node_bg_color[key])
                             ns['size']=0
                             ns['fgcolor']='black'
-                            ns['vt_line_width'] = 2
-                            ns['hz_line_width'] = 2
-                            ns['hz_line_color'] = 'DimGray'
-                            ns['vt_line_color'] = 'DimGray'
+                            ns['vt_line_width'] = branch_width
+                            ns['hz_line_width'] = branch_width
+                            ns['hz_line_color'] = branch_color
+                            ns['vt_line_color'] = branch_color
                             node.set_style(ns)
                 
     
@@ -2692,7 +2821,8 @@ class Project:
                         for key in node_support_dict.keys():
                             if (node.support <= node_support_dict[key][0] and
                                 node.support > node_support_dict[key][1]):
-                                node.add_face(CircleFace(radius = 5, color = key),column=0, position = "float")             
+                                node.add_face(CircleFace(radius = support_bullet_size,
+                                                         color = key),column=0, position = "float")             
                     
                 self.trees[tree][0].render(fig_folder + "/"+self.trees[tree][0].get_leaves()[0].tree_method_id+'.png',w=1000, tree_style=ts)
                 print('<A href='+
@@ -2707,9 +2837,19 @@ class Project:
     def trim(self, list_of_Conf_objects, cutoff=0):
         for m in list_of_Conf_objects:
             m.timeit.append(time.time())
-            m.platform = platform_report() 
-            m.platform.append('Program and version: '+ m.cmd + ': ' +
-                               os.popen(m.cmd + ' --version').readlines()[1])
+            m.platform = platform_report()
+            
+            m.platform.append('Program and version: '+
+                               os.popen(m.cmd + ' --version').readlines()[1].rstrip())
+            m.platform.append('Program reference: '+
+                              'Salvador Capella-Gutierrez; Jose M. Silla-Martinez; Toni Gabaldon. trimAl: '+
+                              'a tool for automated alignment trimming in large-scale '+
+                              'phylogenetic analyses. Bioinformatics 2009 25: 1972-1973.')
+            
+            # In this part, I need to take what I can out of the if isinstance
+            # to facilitate addition of new Conf objects. It can be done like this
+            # but there will be redundancy
+            
             if isinstance(m, TrimalConf):
                 import subprocess as sub
                 for aln in m.command_lines.keys():
@@ -2753,7 +2893,7 @@ class Project:
                     os.remove(file_name)
             m.timeit.append(time.time())
             m.timeit.append(m.timeit[2]-m.timeit[1])
-            self.used_methods.append(m)
+            self.used_methods[m.method_name] = m
 
 
     def report_seq_stats(self):        
@@ -2772,7 +2912,7 @@ class Project:
             draw_boxplot(lengths_dict, 'Seq length (bp)', 'inline')
             
             
-            for stat in ['GC_content']:#, 'nuc_degen_prop', 'prot_degen_prop'):
+            for stat in ['GC_content', 'nuc_degen_prop', 'prot_degen_prop']:
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
                 print title.title()
                 # This will make a dict with loci as keys and a list of stat values as
@@ -3025,8 +3165,37 @@ def list_loci_in_genbank(genbank_filename, control_filename, loci_report = None)
         #print key, value
         print(str(value) +" instances of " + key)
     sys.stdout = stdout
-    return    
+    return   
 
+AlnConfMethodsSection=\
+"""\n
+==============================
+Core Methods section sentence:
+==============================
+The dataset(s) %s were aligned using the program %s [1].
+
+Reference:
+%s
+"""
+
+AlnConfPalNalMethodsSection=\
+"""\n
+==============================
+Core Methods section sentence:
+==============================
+The dataset(s) %s were first aligned at the protein level using the program %s [1].
+The resulting alignments served as guides to codon-align the DNA sequences using %s [2].
+
+Reference:
+[1]%s
+[2]%s
+"""
+
+# ALIGNMENT PROGRAM PLUG
+# AS ABOVE, A STRING IS NEEDED WITH PLACE HOLDERS FOR THE LOCI, THE PROGRAM+VERSION
+# AND FOR THE REFERENCE.
+# ANOTHER STRING IS REQUIRED THAT ALSO INCLUDES PAL2NAL
+    
 ##############################################################################################
 class AlnConf:
 ##############################################################################################
@@ -3044,6 +3213,10 @@ class AlnConf:
     def __init__(self, pj, method_name='mafftDefault', CDSAlign=True, codontable=1, program_name='mafft',
                  cmd='mafft', loci='all',
                  cline_args=dict()):
+        
+        if pj.records_by_locus == {}:
+            pj.extract_by_locus()
+            
         self.id = str(random.randint(10000,99999))+str(time.time())
         self.method_name=method_name
         self.CDSAlign=CDSAlign
@@ -3060,9 +3233,9 @@ class AlnConf:
         for locus in self.loci: 
             if len(pj.records_by_locus[locus.name]) < 4:
                 removed_loci.append(locus.name)
-                #print "%s have less than 4 sequences and will be dropped from this conf object. Don't use it in a concatenation"%locus.name
             else:
                 mutable_loci_list.append(locus)
+                
         if len(removed_loci) > 0:
             print "These loci have less than 4 sequences and will be dropped from this conf object. Don't use them in a concatenation:\n%s\n\n"%removed_loci
         self.loci = mutable_loci_list
@@ -3081,8 +3254,7 @@ class AlnConf:
             self.cmd = pj.defaults['mafft']
             
         # make defalut input files
-        if pj.records_by_locus == {}:
-            pj.extract_by_locus()
+
         for key in pj.records_by_locus.keys():
             if key in [l.name for l in self.loci]:
                 SeqIO.write(pj.records_by_locus[key], self.id+'_'+key+'.fasta', 'fasta')    
@@ -3090,7 +3262,7 @@ class AlnConf:
             # put default input file filename and string in the AlnConf object
             input_filename=self.id+'_'+locus.name+'.fasta'
             self.aln_input_strings[locus.name] = [open(input_filename,'r').read()]
-            # If CDS prepare reference protein input file and in frame CDS input file
+            # If CDS and CDSAlign, prepare reference protein input file and in frame CDS input file
             if locus.feature_type == 'CDS' and locus.char_type == 'dna' and self.CDSAlign: 
                 self.CDS_proteins[locus.name] = []
                 self.CDS_in_frame[locus.name] = []
@@ -3154,6 +3326,7 @@ class AlnConf:
                         unmatched_string += u+' '
                     raise RuntimeError('The following CDS/protein pairs are unmatched: '+unmatched_string)
                     
+ 
                 SeqIO.write(self.CDS_in_frame[locus.name],
                             self.id+'_CDS_in_frame_'+locus.name+'.fasta', 'fasta')
                 input_filename2=self.id+'_CDS_in_frame_'+locus.name+'.fasta'
@@ -3167,6 +3340,13 @@ class AlnConf:
                 self.command_lines[locus.name] = MafftCommandline(cmd=self.cmd)
             elif self.program_name == 'muscle':
                 self.command_lines[locus.name] = MuscleCommandline(cmd=self.cmd)
+            # PROGRAM PLUG
+            # NOTE: MAFFT AND MUSCLE GET FASTA. IF THE NEW PROGRAM GETS SOMETHING
+            # ELSE, SOME WORK IS REQUIRED ABOVE, e.g. condition to choose the format
+            # THIS WRITE THE CLINE AND PLACES IN PROJECT. 
+            # elif self.program_name == 'some program':
+            #    self.command_lines[locus.name] = some_program_cline_object(cmd=self.cmd)
+            # This assumes Bio.Applications style cline object
             for c in cline.keys():
                 self.command_lines[locus.name].__setattr__(c,cline[c])
             print str(self.command_lines[locus.name])
@@ -3182,18 +3362,52 @@ class AlnConf:
         for i in self.command_lines.keys():
             command_lines += i+': '+str(self.command_lines[i])+'\n'
         date = str(self.timeit[0])
-        execution = str(self.timeit[3])
-        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return str("AlnConf named %s with ID %s\n"+         
+        execution = '[This was not executed yet]'
+        if len(self.timeit) > 1:
+            execution = str(self.timeit[3])
+        plat = '[This was not executed yet]'
+        if len(self.platform) > 0:
+            plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+        output =  str("AlnConf named %s with ID %s\n"+         
                 "Loci: %s \n"+       
-                "Executed on: %s\n"+
+                "Created on: %s\n"+
                 "Commands:\n"+
                 "%s\n"+
                 "Environment:\n"+    
                 "%s\n"+
                 "execution time:\n"+
-                "%s")%(self.method_name, str(self.id), loci_string, date, command_lines, plat, execution) 
+                "%s\n")%(self.method_name, str(self.id), loci_string, date, command_lines, plat, execution) 
+        if len(self.platform) > 0 and self.CDSAlign:
+            prog = '[This was not executed yet]'
+            pal = '[This was not executed yet]'
+            progref = '[This was not executed yet]'
+            palref = '[This was not executed yet]'
+            if self.platform[-1].startswith('Program reference:'):
+                prog, pal = self.platform[-2].split(':')[1].strip().rstrip().split('\n')
+                progref, palref = self.platform[-1].split('Program reference:')[1].strip().rstrip().split('\n')
+            output += AlnConfPalNalMethodsSection%(type_to_single_line_str([l.name for l in self.loci]),
+                                                  prog, pal, progref, palref)
+        elif len(self.platform) > 0:
+            prog = '[This was not executed yet]'
+            progref = '[This was not executed yet]'
+            if self.platform[-1].startswith('Program reference:'):
+                prog = self.platform[-2].split(':')[1].strip().rstrip()
+                progref = self.platform[-1].split('Program reference:')[1].strip().rstrip()
+            output += AlnConfMethodsSection%(type_to_single_line_str([l.name for l in self.loci]),
+                                             prog, progref)
+        
+        return output
+    
+TrimalConfMethodsSection=\
+"""\n
+==============================
+Core Methods section sentence:
+==============================
+The alignment(s) %s were trimmed using the program %s [1].
 
+Reference:
+%s
+"""
 ##############################################################################################
 class TrimalConf:
 ##############################################################################################
@@ -3249,18 +3463,33 @@ class TrimalConf:
         for i in self.command_lines.keys():
             command_lines += i+': '+str(self.command_lines[i])+'\n'
         date = str(self.timeit[0])
-        execution = str(self.timeit[3])
-        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return str("TrimalConf named %s with ID %s\n"+         
+        execution = '[This was not executed yet]'
+        if len(self.timeit) > 1:
+            execution = str(self.timeit[3])
+        
+        prog = '[This was not executed yet]'
+        plat = '[This was not executed yet]'
+        progref = '[This was not executed yet]'
+        if len(self.platform) > 0:
+            plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+            if self.platform[-1].startswith('Program reference:'):
+                prog = self.platform[-2].split(':')[1].strip().rstrip()
+                progref = self.platform[-1].split('Program reference:')[1].strip().rstrip()
+        
+        output= str("TrimalConf named %s with ID %s\n"+         
                 "Alignments: %s \n"+       
-                "Executed on: %s\n"+
+                "Created on: %s\n"+
                 "Commands:\n"+
                 "%s\n"+
                 "Environment:"+    
                 "%s\n"+
                 "execution time:\n"+
-                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)  
-
+                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)
+        
+        output += TrimalConfMethodsSection%(type_to_single_line_str(self.alignments.keys()),
+                                            prog, progref)
+        
+        return output
 
 def use_sh_support_as_branch_support(tree_filename):
     string = open(tree_filename,'r').read()
@@ -3463,6 +3692,17 @@ def write_raxml_clines(tree_method, pj, trimmed_alignment_name):
                 presets[preset][cline] = dict({'-q': partfile}, **presets[preset][cline])               
     return presets[tree_method.preset] 
 
+
+RaxmlConfMethodsSection=\
+"""\n
+==============================
+Core Methods section sentence:
+==============================
+Phylogenetic trees were reconstructed from the dataset(s) %s using the program %s [1].
+
+Reference:
+%s
+"""
 ##############################################################################################
 class RaxmlConf:
 ##############################################################################################
@@ -3509,6 +3749,7 @@ class RaxmlConf:
                 print str(cline_object)
 
     def __str__(self):
+
         aln_string = ''
         for n in self.trimmed_alignments.keys():
             aln_string += n+','
@@ -3517,17 +3758,35 @@ class RaxmlConf:
         for i in self.command_lines.keys():
             command_lines += i+': '+str(self.command_lines[i])+'\n'
         date = str(self.timeit[0])
-        execution = str(self.timeit[3])
-        plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
-        return str("RaxmlConf named %s with ID %s\n"+         
+        
+        execution = '[This was not executed yet]'
+        if len(self.timeit) > 1:
+            execution = str(self.timeit[3])
+        
+        prog = '[This was not executed yet]'
+        plat = '[This was not executed yet]'
+        progref = '[This was not executed yet]'
+        
+        if len(self.platform) > 0:
+            plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+            if self.platform[-1].startswith('Program reference:'):
+                prog = self.platform[-2].split(':')[1].strip().rstrip()
+                progref = self.platform[-1].split('Program reference:')[1].strip().rstrip()
+                
+        output = str("RaxmlConf named %s with ID %s\n"+         
                 "Alignments: %s \n"+       
-                "Executed on: %s\n"+
+                "Created on: %s\n"+
                 "Commands:\n"+
                 "%s\n"+
                 "Environment:\n"+    
                 "%s\n"+
                 "execution time:\n"+
-                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)  
+                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)
+        
+        output += RaxmlConfMethodsSection%(type_to_single_line_str(self.trimmed_alignments.keys()),
+                                            prog, progref)
+        
+        return output
 
 def make_pb_input_matrix_file(conf_obj, trimmed_alignment_name):
     SeqIO.write(conf_obj.trimmed_alignments[trimmed_alignment_name],
@@ -3573,14 +3832,50 @@ class PbConf:
         self.keepfiles = keepfiles
         if cmd == 'default':
             self.cmd = pj.defaults['pb']
-        
+            
         for trimmed_alignment in self.trimmed_alignments.keys():
             self.command_lines[trimmed_alignment] = [write_pb_cline(self, pj, trimmed_alignment)]
             print self.command_lines[trimmed_alignment][0]
-            
-#class FastTreeConf:
     
+    def __str__(self):
 
+        aln_string = ''
+        for n in self.trimmed_alignments.keys():
+            aln_string += n+','
+        aln_string = aln_string[:-1]
+        command_lines = ''
+        for i in self.command_lines.keys():
+            command_lines += i+': '+str(self.command_lines[i])+'\n'
+        date = str(self.timeit[0])
+        
+        execution = '[This was not executed yet]'
+        if len(self.timeit) > 1:
+            execution = str(self.timeit[3])
+        
+        prog = '[This was not executed yet]'
+        plat = '[This was not executed yet]'
+        progref = '[This was not executed yet]'
+        
+        if len(self.platform) > 0:
+            plat = str(self.platform).replace(",",'\n').replace(']','').replace("'",'').replace('[','')
+            if self.platform[-1].startswith('Program reference:'):
+                prog = self.platform[-2].split(':')[1].strip().rstrip()
+                progref = self.platform[-1].split('Program reference:')[1].strip().rstrip()
+                
+        output = str("PbConf named %s with ID %s\n"+         
+                "Alignments: %s \n"+       
+                "Created on: %s\n"+
+                "Commands:\n"+
+                "%s\n"+
+                "Environment:\n"+    
+                "%s\n"+
+                "execution time:\n"+
+                "%s")%(self.method_name, str(self.id), aln_string, date, command_lines, plat, execution)
+        
+        output += RaxmlConfMethodsSection%(type_to_single_line_str(self.trimmed_alignments.keys()),
+                                            prog, progref)
+        
+        return output
             
 from pylab import *
 import random
@@ -3941,75 +4236,10 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         print "now reporting methods"
         for method in pj.used_methods:
             # This will print list representations of the 'Conf' objects
-            if isinstance(method,str):
-                title = method.split('\n')[0]
-                report_lines += ('', '<h4>', title, '</h4>','')
-                report_lines += ('<pre>',method,'</pre>')
-            
-            # These will print attributes in actual 'Conf' objects 
-            elif isinstance(method, AlnConf):
-                title = 'Seuqence Alignment Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('', '<h4>', title, '</h4>', '')
-                #--------------------------------------------------------
-                align_line = 'Included loci :'
-                for locus in [locus.name for locus in method.loci]:
-                    align_line += locus + ', '
-                report_lines.append(align_line)
-                report_lines.append('Total execution time: '+str(method.timeit[3])+' sec\'')
-                report_lines.append('Performed on: '+str(method.timeit[0]))
-                report_lines += method.platform
-                report_lines.append('')
-
-                report_lines.append('Command lines:')
-                for cline in method.command_lines.keys():
-                    report_lines.append('Alignment \"'+cline+'\":')
-                    report_lines.append('<pre style="white-space:normal;">')
-                    report_lines.append(str(method.command_lines[cline]))
-                    report_lines.append('</pre>')
-                    
-            elif isinstance(method, RaxmlConf):
-                title = 'Raxml Tree Reconstruction Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('', '<h4>', title, '</h4>', '')
-                #--------------------------------------------------------
-                tree_line = 'Included alignments :'
-                for aln in method.trimmed_alignments.keys():
-                    tree_line += aln + ', '
-                report_lines.append(tree_line)
-                report_lines.append('Total execution time: '+str(method.timeit[3])+' sec\'')
-                report_lines.append('Performed on: '+str(method.timeit[0]))
-                report_lines += method.platform
-                report_lines.append('')
-
-                report_lines.append('Command lines:')
-                for aln in method.command_lines.keys():
-                    report_lines.append('Alignment \"'+aln+'\":')
-                    report_lines.append('<pre style="white-space:normal;">')
-                    for cline in method.command_lines[aln]:
-                        report_lines.append(str(cline))
-                    report_lines.append('</pre>')
-                    report_lines.append('')
-                    
-            elif isinstance(method, TrimalConf):
-                title = 'Trimal alignment trimming Method \"'+method.method_name+'\", method ID: '+method.id
-                report_lines += ('<h4>', title, '</h4>', '')
-                #--------------------------------------------------------
-                aln_line = 'Included alignments :'
-                for aln in method.alignments.keys():
-                    aln_line += aln + ', '
-                report_lines.append(aln_line)
-                report_lines.append('Total execution time: '+str(method.timeit[3])+' sec\'')
-                report_lines.append('Performed on: '+str(method.timeit[0]))
-                report_lines += method.platform
-                report_lines.append('')
-
-                report_lines.append('Command lines:')
-                for aln in method.command_lines.keys():
-                    report_lines.append('Alignment \"'+aln+'\":')
-                    report_lines.append('<pre style="white-space:normal;">')
-                    report_lines.append(str(method.command_lines[aln]))
-                    report_lines.append('</pre>')
-                    report_lines.append('')
-                
+            title = str(pj.used_methods[method]).split('\n')[0]
+            report_lines += ('', '<h4>', title, '</h4>','')
+            report_lines += ('<pre>',str(pj.used_methods[method]),'</pre>')
+       
                 
         report_lines += ['',''] 
         
@@ -4222,13 +4452,13 @@ def unpickle_pj(pickle_file_name):
                   ]
     
     for attr_name in attr_names:
-       setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
+        setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
         
     for i in pkl_pj.used_methods:
-        if isinstance(i, str):
-            new_pj.used_methods.append(i)
+        if isinstance(pkl_pj.used_methods[i], str):
+            new_pj.used_methods.append[i] = pkl_pj.used_methods[i]
         else:
-            new_pj.used_methods.append(str(i))
+            new_pj.used_methods.append[i] = str(pkl_pj.used_methods[i])
     return new_pj
 
 def publish(pj, folder_name, figures_folder, size='small'):
@@ -5232,7 +5462,9 @@ class LociStats:
                                         reverse=reverse)
         self.loci_stats_sorted = [list(i) for i in self.loci_stats_sorted]
         
-    def plot(self, filename, figsize=(30,10), params='all', lable_fsize=40, xtick_fsize=4, ytick_fsize=4):
+    def plot(self, filename, figsize=(30,10), params='all', lable_fsize=40, xtick_fsize=4, ytick_fsize=4,
+            boxcolor='salmon', whiskercolor='gray', capcolor='black', mediancolor='white', medianline_w=3):
+        
         parameter_indices = [3,4,5,1,2]
         
         ytitles=['',
@@ -5257,8 +5489,6 @@ class LociStats:
                     parameter_indices.append(2)
         if len(parameter_indices) == 0:
             raise IOError('Must specify at least one parameter to plot')
-                
-        #fig = plt.figure(figsize=figsize, dpi=80, frameon = False)
         
         fig, axes = plt.subplots(len(parameter_indices), sharex=True, figsize=figsize, dpi=80, frameon = False)
         
@@ -5273,7 +5503,7 @@ class LociStats:
             
             values = [k[parameter_indices[j]] for k in self.loci_stats_sorted]
             
-            bp = ax.boxplot(values,0,'', positions = range(4,(len(values)*4)+1, 4))
+            bp = ax.boxplot(values,0,'', positions = range(4,(len(values)*4)+1, 4), patch_artist=True)
             ax.set_ylabel(ytitles[parameter_indices[j]], fontsize=lable_fsize)
             #plt.xlabel("Locus", fontsize=lable_fsize)
             plt.xticks(range(4,((len(values)+1)*4),4), labels, rotation=90, fontsize = xtick_fsize)
@@ -5284,20 +5514,22 @@ class LociStats:
             remove_border()
             for box in bp['boxes']:
             # change outline color
-                box.set( color='salmon', linewidth=1)
+                box.set( color=boxcolor, linewidth=1)
+                box.set_facecolor(boxcolor)
                     
             # change color, linestyle and linewidth of the whiskers
             for whisker in bp['whiskers']:
-                whisker.set(color='lightgray', linestyle='solid', linewidth=2.0)
+                whisker.set(color=whiskercolor, linestyle='solid', linewidth=2.0)
             
             # change color and linewidth of the caps
             for cap in bp['caps']:
-                cap.set(color='gray', linewidth=2.0)
+                cap.set(color=capcolor, linewidth=2.0)
         
             # change color and linewidth of the medians
             for median in bp['medians']:
-                median.set(color='white', linewidth=2)
-            
+                median.set(color=mediancolor, linewidth=medianline_w)
+        
+        fig.gca().set_ylim(bottom=-0.05)
         fig.savefig(filename)
         
     def slice_loci(self, median_range, otu_meta, parameter='entropy',
