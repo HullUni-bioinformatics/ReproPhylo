@@ -1,8 +1,8 @@
-
-##############################################################################################
+reprophyloversion=1.0
+############################################################################################
 if False:
     """
-    ReproPhylo version 0.1 
+    ReproPhylo version 1 
     
     General purpose phylogenetics package for reproducible and experimental analysis
     
@@ -29,11 +29,11 @@ if False:
     pandas
     
     RAxML 8
-    Phylobayes
-    Trimal
-    Muscle
-    Mafft
-    Pal2nal
+    Phylobayes 3
+    Trimal 1
+    Muscle 
+    Mafft 7
+    Pal2nal 14
     """
 ##############################################################################################
 
@@ -43,7 +43,6 @@ from Bio import SeqIO
 import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast, gb_syn
 import HTML, inspect, shutil
 import subprocess as sub
-#import cloud.serialization.cloudpickle as pickle
 from Bio.Seq import Seq
 import numpy as np
 import matplotlib.pyplot as plt
@@ -155,19 +154,24 @@ class Concatenation:
         self.otu_meta = otu_meta
         self.otu_must_have_all_of = otu_must_have_all_of
         self.otu_must_have_one_of = otu_must_have_one_of
+        if isinstance(otu_must_have_all_of,str):
+            raise IOError('The keyword \'otu_must_have_all_of\' has to be a list')
         if isinstance(otu_must_have_one_of[0],str) and not otu_must_have_one_of == 'any':
             raise IOError('The keyword \'otu_must_have_one_of\' has to be a list of lists')
         if self.otu_must_have_one_of == 'any':
             self.otu_must_have_one_of = [[l.name for l in self.loci]]
-        self.feature_id_dict = {}
-        self.define_trimmed_alns = define_trimmed_alns
-        self.used_trimmed_alns = {}
+        self.feature_id_dict = {} # Will hold the feature_id list for each otu
+        self.define_trimmed_alns = define_trimmed_alns # To choose between alternative
+        # alignments of the same locus
+        self.used_trimmed_alns = {} #To hold the alignment chosen for each locus
+        
+        # Validate loci list
         seen = []
         for locus in loci:
             if not isinstance(locus, Locus):
                 raise TypeError("Expecting Locus object in loci list")
             if locus.name in seen:
-                raise NameError('Locus ' + locus.name + ' apears more than once in self.loci')
+                raise NameError('Locus ' + locus.name + ' appears more than once in self.loci')
             else:
                 seen.append(locus.name)
       
@@ -211,15 +215,46 @@ if False:
 ##############################################################################################
 
 
+## Git management
 
 __builtin__.git = False
 
 
+# git log template
+gitline = "<<<<\n%s\nSTDOUT:\n%s\nSTDERR:%s\n>>>>\n"
 
-def start_git():
-    __builtin__.git = True
-    rpgit.gitInit()
-    cwd = os.getcwd()
+def undate_git_log(pj, out, err):
+    if not err:
+        err = 'None'
+    if not out:
+        out = 'None'
+    pj.git_log += gitline%(str(time.asctime()),str(out), str(err))
+
+def start_git(pj):
+    __builtin__.git = True # flag it on
+    cwd = os.getcwd() 
+    if os.path.isdir(cwd + '/.git'):
+        # a repo exists, check it belongs to this project by checking the description
+        try:
+            assert open(cwd + '/.git/description').read().strip().rstrip() == pj.pickle_name.strip().rstrip()
+            warnings.warn('Git repository exists for this Project')
+        except:
+            raise RuntimeError('The Git repository in the CWD does not belong to this project. Either the pickle'+
+                              ' moved, or this is a preexsisting repo. Try one of the following: Delete the local '+
+                              ' .Git dir if you don\'t need it, move the pickle and the notebook to a new work dir,'+
+                              ' or if possible, move them back to their original location. You may also disable Git'+
+                              ' by with stop_git().')
+    else:
+        # start a rep
+        out, err = rpgit.gitInit()
+        undate_git_log(pj, out, err)
+        # write the pickle name as the repo description
+        hndl = open(cwd + '/.git/description', 'wt')
+        hndl.write(pj.pickle_name.strip().rstrip())
+        hndl.close()
+        warnings.warn('The new repository is called %s.'%open(cwd + '/.git/description', 'r').read().rstrip())
+    
+    # list scripts and notebooks
     import fnmatch
     matches = []
     for root, dirnames, filenames in os.walk(cwd):
@@ -227,16 +262,23 @@ def start_git():
             matches.append(os.path.join(root, filename))
         for filename in fnmatch.filter(filenames, '*.ipynb'):
             matches.append(os.path.join(root, filename))
+    # git add scripts and notebooks
     for match in matches:
-        rpgit.gitAdd(match)
+        out, err = rpgit.gitAdd(match)
+        undate_git_log(pj, out, err)
+    # commit scripts and notebooks
     comment = "%i script file(s) from %s" % (len(matches), time.asctime())
-    rpgit.gitCommit(comment)
+    out, err = rpgit.gitCommit(comment)
+    undate_git_log(pj, out, err)
     
     
     
 def stop_git():
-    __builtin__.git = False
+    __builtin__.git = False # flad it off
     cwd = os.getcwd()
+    
+    # list, git add and git commit scripts and notebooks
+    # list
     import fnmatch
     matches = []
     for root, dirnames, filenames in os.walk(cwd):
@@ -244,12 +286,16 @@ def stop_git():
             matches.append(os.path.join(root, filename))
         for filename in fnmatch.filter(filenames, '*.ipynb'):
             matches.append(os.path.join(root, filename))
+    # add
     for match in matches:
-        rpgit.gitAdd(match)
+        out, err = rpgit.gitAdd(match)
+        undate_git_log(pj, out, err)
+    # commit
     comment = "%i script file(s) from %s" % (len(matches), time.asctime())
-    rpgit.gitCommit(comment)
+    out, err = rpgit.gitCommit(comment)
+    undate_git_log(pj, out, err)
     
-
+## end git management
 
 def platform_report():
     
@@ -260,13 +306,15 @@ def platform_report():
     True
     """
     import pkg_resources
-    modules = []
+    modules = [] # and their versions
     for i in ('ete2','biopython','dendropy','cloud'):
         try:
             modules.append(i+' version: '+
-                                pkg_resources.get_distribution(i).version)
+                           pkg_resources.get_distribution(i).version)
         except:
             pass
+    modules.append('reprophylo version %s'%str(reprophyloversion))
+                   
     return(['Platform: '+platform.platform(aliased=0, terse=0),
             'Processor: '+platform.processor(),
             'Python build: '+platform.python_build()[0] + platform.python_build()[1],
@@ -294,7 +342,8 @@ def write_alns(pj, format = 'fasta'):
 def keep_feature(feature, loci):
     
     """ Returns true if a feature's type is in one of the loci and if the gene
-    or product qualifiers is in the aliases of one of the loci
+    or product qualifiers is in the aliases of one of the loci, for data collection
+    from a genbank or embl file
     
     # making a dummy feature
     >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
@@ -368,11 +417,13 @@ def dwindle_record(record, loci):
     feature_count = 0
     for feature in record.features:
         if keep_feature(feature, loci)== True:
+            # determine feature id       
             if feature.type == 'source' and not 'feature_id' in feature.qualifiers.keys():
                 feature.qualifiers['feature_id'] = [record.id + '_source']
             elif not 'feature_id' in feature.qualifiers.keys():
                 feature.qualifiers['feature_id'] = [record.id + '_f' + str(feature_count)]
                 feature_count += 1
+            # determine prop ambiguity and GC content       
             if not feature.type == 'source':
                 feature_seq = feature.extract(record.seq)
                 degen = len(feature_seq)
@@ -465,12 +516,15 @@ def get_qualifiers_dictionary(project, feature_id):
     Takes sequence record annotation, source qualifiers and feature qualifiers and puts them
     in a flat dictionary
     
+    This is being replaced by __get_qualifiers_dictionary__ which deals with the records as a dict
+    and is much faster. Eventually, records will be handled as a dict throughout, instead of as
+    a list.
         
     # Making a dummy locus    
     >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
     
     # Making a dummy Project
-    >>> pj = Project([coi])
+    >>> pj = Project([coi], git=False)
     
     # making a dummy record
     >>> s = 'atgc'*1000
@@ -500,6 +554,8 @@ def get_qualifiers_dictionary(project, feature_id):
     gene                CoI                 
     source_organism     Tetillda radiata    
     """
+    if type(feature_id) is list and len(feature_id) > 1:
+        raise IOError('get_qualifiers_dictionary takes one feature_id at a time')
     if type(feature_id) is list:
         feature_id = feature_id[0]
     record_id = feature_id.split('_')[0]
@@ -525,6 +581,8 @@ def __get_qualifiers_dictionary__(project, feature_id):
     
     It requires Project.__records_list_to_dict__() to execute beforehand.
     """
+    if type(feature_id) is list and len(feature_id) > 1:
+        raise IOError('get_qualifiers_dictionary takes one feature_id at a time')
     if type(feature_id) is list:
         feature_id = feature_id[0]
     record_id = feature_id.split('_')[0]
@@ -564,6 +622,11 @@ def seq_format_from_suffix(suffix):
 
 
 def read_feature_quals_from_tab_csv(csv_filename):
+                   
+    """
+    This is used to update feature qualifiers from a tab delimited file
+    """               
+                   
     import re
     header = open(csv_filename, 'r').readlines()[0].rstrip().split('\t')
     feature_id_col = header.index('feature_id')
@@ -588,13 +651,16 @@ def read_feature_quals_from_tab_csv(csv_filename):
         for i in range(len(header)):
             if get_source and 'source:_' in header[i]:
                 qual_name = re.sub('source:_','',header[i])
-                if not line[i] == 'null' and not line[i] == '':
+                if not line[i] == 'null' and not line[i] == '' and line[i]:
                     csv_info[line[0]]['source'][qual_name] = line[i].split(';')
-            elif (not 'source:_' in header[i] and not line[i] == 'null' and not line[i] == '' and
+            elif (not 'source:_' in header[i] and not line[i] == 'null' and not line[i] == '' and line[i] and
                   not i in [seq_col, translation_col, taxonomy_col, feature_id_col]):
                 csv_info[line[0]]['features'][line[feature_id_col]][header[i]] = line[i].split(';')
     return csv_info
 
+
+## Alignment statistics
+                   
 def count_positions(aln_column):
     counts = {}
     for i in aln_column:
@@ -658,8 +724,14 @@ def aln_summary(aln_obj, cutoff=0):
              ]
     return [lines, len(aln_obj), count_undetermined_lines(aln_obj, cutoff=cutoff), count_collapsed_aln_seqs(aln_obj)]        
             
-
+##
+                   
 def loci_list_from_csv(loci):
+    """
+    Parse the loci csv file given to Project
+    """               
+    
+    # verify format
     if any(len(line.split(',')) >= 4 for line in open(loci, 'r').readlines()):
         pass
     else:
@@ -669,9 +741,11 @@ def loci_list_from_csv(loci):
     loci_dict = {}
     loci_list = []
     for line in [line.rstrip() for line in open(loci, 'r').readlines() if len(line.rstrip()) > 0]:
+        # verify format
         if len(line.split(',')) < 4:
             raise IOError("The line %s in file %s is missing arguments. Needs at least char_type,feature_type,name,aliases"%
                           (line.rstrip(), loci))
+        # look for synonyms
         else:
             group = None
             try:
@@ -801,7 +875,7 @@ class Project:
     by calling stop_git() and restarted by calling start_git() again.
     """
 
-    def __init__(self, loci):
+    def __init__(self, loci, pickle=None, git=True):
         
         """
         # making dummy loci
@@ -809,7 +883,7 @@ class Project:
         >>> ssu = Locus('dna','rRNA','18S',['18S','SSU'])
         
         # Making a Project object
-        >>> pj = Project([coi,ssu])
+        >>> pj = Project([coi,ssu], git=False)
         >>> print(str(pj))
         Project object with the loci coi,18S,
         """
@@ -830,8 +904,18 @@ class Project:
         self.trees = {}
         self.used_methods = {}
         self.sets = {}
+        self.git_log = ''
         
-
+        self.pickle_name=pickle
+        
+        if self.pickle_name and os.path.exists(self.pickle_name):
+            raise IOError('Pickle %s exists. If you want to keep using it do pj=unpickle_pj(\'%s\') instead.'%(self.pickle_name,self.pickle_name))
+        
+        if git and not self.pickle_name:
+            raise IOError('Must have pickle to run Git. Either specify pickle or git=False')
+        elif git:
+            start_git(self)
+         
         self.defaults = {'raxmlHPC': programspath+'raxmlHPC-PTHREADS-SSE3',
                          'mafft': 'mafft',
                          'muscle': programspath+'muscle',
@@ -861,6 +945,28 @@ class Project:
             #for l in self.loci:
                 #print str(l)
         self.aln_summaries = []
+        
+        if self.pickle_name:
+            pickle_pj(self, self.pickle_name, track=False)
+        
+        if __builtin__.git and self.pickle_name:
+            import rpgit
+            comment = "%s from %s" % (str(self), time.asctime())
+            out, err = rpgit.gitAdd(self.pickle_name)
+            undate_git_log(self, out, err)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
                 
                 
     def __str__(self):
@@ -872,6 +978,12 @@ class Project:
 
     def __records_list_to_dict__(self):
         self._records_dict = SeqIO.to_dict(self.records)
+        
+    def last_git_log(self):
+        print self.git_log.split('<<<<')[-1]
+        
+    def show_commits(self):
+        print rpgit.gitLog()[0]
         
     ###################################
     # Project methods for reading data
@@ -886,7 +998,7 @@ class Project:
         
         >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> pj = Project([locus])
+        >>> pj = Project([locus], git=False)
         >>> print(len(pj.records))
         0
         >>> pj.read_embl_genbank(input_filenames)
@@ -902,7 +1014,8 @@ class Project:
         for input_filename in input_filenames_list:
             if __builtin__.git:
                 import rpgit
-                rpgit.gitAdd(input_filename)
+                out, err = rpgit.gitAdd(input_filename)
+                undate_git_log(self, out, err)
             generators.append(parse_input(input_filename, 'gb'))
             for generator in generators:
                 for record in generator:
@@ -915,7 +1028,8 @@ class Project:
             import rpgit
             comment = "%i genbank/embl data file(s) from %s" % (len(input_filenames_list), time.asctime()) 
             for filename in input_filenames_list:
-                rpgit.gitAdd(filename)
+                out, err = rpgit.gitAdd(filename)
+                undate_git_log(self, out, err)
             cwd = os.getcwd()
             import fnmatch
             matches = []
@@ -925,8 +1039,10 @@ class Project:
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     matches.append(os.path.join(root, filename))
             for match in matches:
-                rpgit.gitAdd(match)    
-            rpgit.gitCommit(comment) 
+                out, err = rpgit.gitAdd(match) 
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment) 
+            undate_git_log(self, out, err)
             
         
         
@@ -942,7 +1058,7 @@ class Project:
 
         >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> pj = Project([locus])
+        >>> pj = Project([locus], git=False)
         >>> print(len(pj.records))
         0
         >>> pj.read_embl_genbank(input_filenames)
@@ -1009,7 +1125,8 @@ class Project:
             import rpgit
             comment = "%i denovo data file(s) from %s" % (len(input_filenames), time.asctime())
             for filename in input_filenames:
-                rpgit.gitAdd(filename)
+                out, err = rpgit.gitAdd(filename)
+                undate_git_log(self, out, err)
             cwd = os.getcwd()
             import fnmatch
             matches = []
@@ -1019,8 +1136,10 @@ class Project:
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     matches.append(os.path.join(root, filename))
             for match in matches:
-                rpgit.gitAdd(match)
-            rpgit.gitCommit(comment)
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
         return count       
     
     def read_alignment(self, filename, char_type, feature_type, locus_name, format="fasta", aln_method_name = "ReadDirectly", exclude=[]):
@@ -1119,7 +1238,8 @@ class Project:
         if __builtin__.git:
             import rpgit
             comment = "Alignment file %s" % (time.asctime())
-            rpgit.gitAdd(filename)
+            out, err = rpgit.gitAdd(filename)
+            undate_git_log(self, out, err)
             cwd = os.getcwd()
             import fnmatch
             matches = []
@@ -1129,8 +1249,10 @@ class Project:
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     matches.append(os.path.join(root, filename))
             for match in matches:
-                rpgit.gitAdd(match)
-            rpgit.gitCommit(comment)
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
 
     def add_feature_to_record(self, record_id, feature_type, location='full', qualifiers={}):
     
@@ -1139,7 +1261,7 @@ class Project:
         >>> coi = Locus('dna','CDS','coi', ['cox1','COX1','coi','COI','CoI'])
     
         # Making a dummy Project
-        >>> pj = Project([coi])
+        >>> pj = Project([coi], git=False)
     
         # making a dummy record
         >>> s = 'atgc'*1000
@@ -1266,7 +1388,7 @@ class Project:
         Alignments with the following names: MafftLinsi@Gappyout are prefered
         
         # making a dummy Project
-        >>> pj = Project(loci)
+        >>> pj = Project(loci, git=False)
         
         # Including the Concatenation in the Project
         >>> pj.add_concatenation(combined)
@@ -1696,7 +1818,8 @@ class Project:
         if __builtin__.git:
             import rpgit
             comment = "Records %s text file from %s" % (format, time.asctime())
-            rpgit.gitAdd(filename)
+            out, err = rpgit.gitAdd(filename)
+            undate_git_log(self, out, err)
             cwd = os.getcwd()
             import fnmatch
             matches = []
@@ -1706,8 +1829,10 @@ class Project:
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     matches.append(os.path.join(root, filename))
             for match in matches:
-                rpgit.gitAdd(match)
-            rpgit.gitCommit(comment)
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
 
     def correct_metadata_from_file(self,csv_file):
         metadata = read_feature_quals_from_tab_csv(csv_file)
@@ -1740,7 +1865,8 @@ class Project:
         if __builtin__.git:
             import rpgit
             comment = "Corrected metadata CSV file from %s" % (time.asctime())
-            rpgit.gitAdd(csv_file)
+            out, err = rpgit.gitAdd(csv_file)
+            undate_git_log(self, out, err)
             cwd = os.getcwd()
             import fnmatch
             matches = []
@@ -1750,8 +1876,10 @@ class Project:
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     matches.append(os.path.join(root, filename))
             for match in matches:
-                rpgit.gitAdd(match)
-            rpgit.gitCommit(comment)
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
                 
     def if_this_then_that(self, IF_THIS, IN_THIS, THEN_THAT, IN_THAT, mode = 'whole'):
         
@@ -1768,7 +1896,7 @@ class Project:
         # Make a dummy pj with a locus and with records
         >>> input_filenames = ['test-data/test.gb']
         >>> locus = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
-        >>> pj = Project([locus])
+        >>> pj = Project([locus], git=False)
         >>> pj.read_embl_genbank(input_filenames)
         
         # copying a source qualifier into the feature qualifiers so that it
@@ -1980,7 +2108,7 @@ class Project:
         >>> input_filenames = ['test-data/test.gb']
         >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
         >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
-        >>> pj = Project([coi, lsu])
+        >>> pj = Project([coi, lsu], git=False)
         >>> pj.read_embl_genbank(input_filenames)
         >>> pj.extract_by_locus()
         >>> print(len(pj.records_by_locus['coi']))
@@ -2249,6 +2377,33 @@ class Project:
                 self.used_methods[method.method_name] = method
 
 
+            if self.pickle_name:
+                pickle_pj(self, self.pickle_name, track=False)
+        
+            if __builtin__.git and self.pickle_name:
+
+                comment = ''
+                for method in alignment_methods:
+                    comment += '%s\n'%(str(method))
+
+                import rpgit
+                out, err = rpgit.gitAdd(self.pickle_name)
+                undate_git_log(self, out, err)
+                cwd = os.getcwd()
+                import fnmatch
+                matches = []
+                for root, dirnames, filenames in os.walk(cwd):
+                    for filename in fnmatch.filter(filenames, '*.py'):
+                        matches.append(os.path.join(root, filename))
+                    for filename in fnmatch.filter(filenames, '*.ipynb'):
+                        matches.append(os.path.join(root, filename))
+                for match in matches:
+                    out, err = rpgit.gitAdd(match)
+                    undate_git_log(self, out, err)
+                out, err = rpgit.gitCommit(comment)
+                undate_git_log(self, out, err)
+                
+                
 
     def write_alns(self, id=['feature_id'], format = 'fasta'):
         filenames = []
@@ -2433,8 +2588,8 @@ class Project:
                 raxml_method.platform.append('Program and version: '+ raxml_method.cmd +
                                              os.popen(raxml_method.cmd + ' -version').readlines()[2].split('This is ')[1].split(' released')[0])
                 raxml_method.platform.append('Program reference: '+
-                                             'A. Stamatakis: "RAxML Version 8: A tool for Phylogenetic Analysis '+
-                                             'and Post-Analysis of Large Phylogenies". In Bioinformatics, 2014.')
+                                             'A. Stamatakis: RAxML Version 8: A tool for Phylogenetic Analysis '+
+                                             'and Post-Analysis of Large Phylogenies. In Bioinformatics, 2014.')
             elif isinstance(raxml_method, PbConf):
                 p = sub.Popen(raxml_method.cmd+" -v", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
                 raxml_method.platform.append('Program and version: '+p.communicate()[1].splitlines()[-1])
@@ -2582,7 +2737,31 @@ class Project:
                                 os.remove(file_name)
             self.used_methods[raxml_method.method_name] = raxml_method
 
-
+        if self.pickle_name:
+            pickle_pj(self, self.pickle_name, track=False)
+        
+        if __builtin__.git and self.pickle_name:
+            
+            comment = ''
+            for raxml_method in raxml_methods:
+                comment += '%s\n'%(str(raxml_method))
+            
+            import rpgit
+            out, err = rpgit.gitAdd(self.pickle_name)
+            undate_git_log(self, out, err)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
 
     def clear_tree_annotations(self):
         for tree in self.trees.keys():
@@ -2894,7 +3073,32 @@ class Project:
             m.timeit.append(time.time())
             m.timeit.append(m.timeit[2]-m.timeit[1])
             self.used_methods[m.method_name] = m
-
+            
+        if self.pickle_name:
+            pickle_pj(self, self.pickle_name)
+        
+        if __builtin__.git and self.pickle_name:
+            
+            comment = ''
+            for m in list_of_Conf_objects:
+                comment += '%s\n'%(str(m))
+            
+            import rpgit
+            out, err = rpgit.gitAdd(self.pickle_name)
+            undate_git_log(self, out, err)
+            cwd = os.getcwd()
+            import fnmatch
+            matches = []
+            for root, dirnames, filenames in os.walk(cwd):
+                for filename in fnmatch.filter(filenames, '*.py'):
+                    matches.append(os.path.join(root, filename))
+                for filename in fnmatch.filter(filenames, '*.ipynb'):
+                    matches.append(os.path.join(root, filename))
+            for match in matches:
+                out, err = rpgit.gitAdd(match)
+                undate_git_log(self, out, err)
+            out, err = rpgit.gitCommit(comment)
+            undate_git_log(self, out, err)
 
     def report_seq_stats(self):        
         if len(self.records_by_locus.keys())>0:
@@ -3203,7 +3407,7 @@ class AlnConf:
     """
     >>> coi = Locus('dna', 'CDS', 'coi', ['cox1','COX1','coi','COI','CoI'])
     >>> lsu = Locus('dna', 'rRNA', '28S', ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'])
-    >>> pj = Project([coi, lsu])
+    >>> pj = Project([coi, lsu], git=False)
     
     # cline_str = muscle = AlnConf(pj, method_name='MuscleDefaults',
     #                                      cmd='muscle', program_name='muscle',
@@ -4421,15 +4625,19 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         return lines
     
         
-def pickle_pj(pj, pickle_file_name):
+def pickle_pj(pj, pickle_file_name, track=True):
     import os
     if os.path.exists(pickle_file_name):
+        #print "DEBUG pickle_pj: %s"%str(os.stat(pickle_file_name).st_ctime)
+        #print "DEBUG pickle_pj: %s"%str(os.stat(pickle_file_name).st_size)
         os.remove(pickle_file_name)
     import cloud.serialization.cloudpickle as pickle
     output = open(pickle_file_name,'wb')
     pickle.dump(pj, output)
     output.close()
-    if __builtin__.git:
+    #print "DEBUG pickle_pj: %s"%str(os.stat(pickle_file_name).st_ctime)
+    #print "DEBUG pickle_pj: %s"%str(os.stat(pickle_file_name).st_size)
+    if __builtin__.git and track:
         import rpgit
         rpgit.gitAdd(pickle_file_name)
         comment = "A pickled Project from %s" % time.asctime()
@@ -4437,18 +4645,24 @@ def pickle_pj(pj, pickle_file_name):
         
     return pickle_file_name
     
-def unpickle_pj(pickle_file_name):
+def unpickle_pj(pickle_file_name, git=True):
     import cloud.serialization.cloudpickle as pickle
     pickle_handle = open(pickle_file_name, 'rb')
     pkl_pj = pickle.pickle.load(pickle_handle)
-    new_pj = Project(pkl_pj.loci)
-    attr_names = ['aln_summaries',
-                  'alignments',
-                  'concatenations',
-                  'records',
-                  'records_by_locus',
-                  'trees',
-                  'trimmed_alignments',
+    new_pj = Project(pkl_pj.loci, git=False)
+    attr_names = [ 'alignments',
+                     'aln_summaries',
+                     'concatenations',
+                     'defaults',
+                     'git_log',
+                     'pickle_name',
+                     'records',
+                     'records_by_locus',
+                     'sets',
+                     'starttime',
+                     'trees',
+                     'trimmed_alignments',
+                     'user',
                   ]
     
     for attr_name in attr_names:
@@ -4456,10 +4670,30 @@ def unpickle_pj(pickle_file_name):
         
     for i in pkl_pj.used_methods:
         if isinstance(pkl_pj.used_methods[i], str):
-            new_pj.used_methods.append[i] = pkl_pj.used_methods[i]
+            new_pj.used_methods[i] = pkl_pj.used_methods[i]
         else:
-            new_pj.used_methods.append[i] = str(pkl_pj.used_methods[i])
+            new_pj.used_methods[i] = str(pkl_pj.used_methods[i])
+    if git:
+        start_git(new_pj)
     return new_pj
+
+def revert_pickle(pj, commit_hash):
+    pickle_filename = pj.pickle_name
+    if not os.path.exists(pickle_filename):
+        raise RuntimeError('Cannot find %s. Has the pickle been moved'%pickle_filename)
+    cmd = 'git checkout %s -- %s'%(commit_hash, pickle_filename)
+    pipe = sub.Popen(cmd, shell=True, stdout = sub.PIPE,stderr = sub.PIPE )
+    (out, error) = pipe.communicate()
+    print 'Git STDOUT: %s'%str(out)
+    print 'Git STDERR: %s'%str(error)
+    new_pj = unpickle_pj(pickle_filename)
+    new_pj.git_log += "<<<<\nThe pickle was reverted to commit %s\nSTDOUT:\n%s\nSTDERR:%s\n>>>>\n"%(commit_hash,
+                                                                                                   str(out),
+                                                                                                   str(error))
+    return new_pj
+                                                                                                    
+    
+
 
 def publish(pj, folder_name, figures_folder, size='small'):
     
@@ -4988,12 +5222,11 @@ def exonerate_ryo_to_gb(q, d, stats, results, get_query=False):
             CDS = SeqFeature(CompoundLocation(coding_locations), type='CDS')
         CDS.qualifiers['gene'] = [match['qid']]
         get = False
-        try:
-            CDS.qualifiers['translation'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
-            assert CDS.qualifiers['translation'][0] == str(Seq(match['tcds'].replace(' ','').replace('\n',''),
-                                                                alphabet=IUPAC.ambiguous_dna).translate(table=gencode)).replace('*','X')
+        CDS.qualifiers['translation'] = [str(CDS.extract(r.seq).translate(table=gencode)).replace('*','X')]
+        if CDS.qualifiers['translation'][0] == str(Seq(match['tcds'].replace(' ','').replace('\n',''),
+                                                       alphabet=IUPAC.ambiguous_dna).translate(table=gencode)).replace('*','X'):
             get = True
-        except:
+        else:
             CDS.qualifiers['translation'] = ['something went wrong']
             print "DEBUG bad CDS"
             print match['tid']
