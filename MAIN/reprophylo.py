@@ -820,7 +820,8 @@ def parse_paup_charset(nexus_filename):
                           ' (case insensitive, spaces around the "=" or "-" not mandatory). Got %s'%line)
     return charsets
         
-def pj_from_nexus_w_charset(nexus_filename, output_dir, char_type, feature_type, project=False):
+def pj_from_nexus_w_charset(nexus_filename, output_dir, char_type,
+                            feature_type, project=False, pickle=False, git=False):
     
     """ 
     Takes a nexus file with PAUP style charset commands as input.
@@ -847,7 +848,7 @@ def pj_from_nexus_w_charset(nexus_filename, output_dir, char_type, feature_type,
     
     if project:
         from reprophylo import Project
-        pj = Project(loci_list)
+        pj = Project(loci_list, pickle=pickle, git=git)
         for f in filenames:
             locus_name = f.split('/')[-1].split('.')[0]
             print '%i/%i reading %s'%(i,len(filenames), locus_name)
