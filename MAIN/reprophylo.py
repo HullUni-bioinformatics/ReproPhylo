@@ -4648,26 +4648,50 @@ def pickle_pj(pj, pickle_file_name, track=True):
 def unpickle_pj(pickle_file_name, git=True):
     import cloud.serialization.cloudpickle as pickle
     pickle_handle = open(pickle_file_name, 'rb')
+    
+    # fix some attr: add git_log if None, turn Confs to strings.
     pkl_pj = pickle.pickle.load(pickle_handle)
     new_pj = Project(pkl_pj.loci, git=False)
-    attr_names = [ 'alignments',
-                     'aln_summaries',
-                     'concatenations',
-                     'defaults',
-                     'git_log',
-                     'pickle_name',
-                     'records',
-                     'records_by_locus',
-                     'sets',
-                     'starttime',
-                     'trees',
-                     'trimmed_alignments',
-                     'user',
-                  ]
     
+    # These do not need fixing
+    attr_names = [ 'alignments',
+                   'aln_summaries',
+                   'concatenations',
+                   'defaults',
+                   'git_log',
+                   'pickle_name',
+                   'records',
+                   'records_by_locus', 
+                   'sets',
+                   'starttime',
+                   'trees',
+                   'trimmed_alignments',
+                   'user',
+                 ]
+    
+    # Move the content into the new pj, Add git_log if missing
     for attr_name in attr_names:
-        setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
-        
+        try:
+            setattr(new_pj,attr_name,getattr(pkl_pj,attr_name))
+        except:
+            warnings.warn('Upgrading Project to v1')
+    
+    # upgrade used methods to dict, if list.
+    if isinstance(pkl_pj.used_methods, list) and len(pkl_pj.used_methods) == 0:
+        pkl_pj.used_methods = {}
+
+    elif isinstance(pkl_pj.used_methods, list) and len(pkl_pj.used_methods) > 0:
+        temp = {}
+        if isinstance(pkl_pj.used_methods[0], str):
+            for m in pkl_pj.used_methods:
+                name = m.split()[1]
+                temp[name] = m
+        elif not isinstance(pkl_pj.used_methods[0], str):
+            for m in pkl_pj.used_methods:
+                temp[m.method_name] = m
+        pkl_pj.used_methods = temp
+    
+    # Turn Confs to strings
     for i in pkl_pj.used_methods:
         if isinstance(pkl_pj.used_methods[i], str):
             new_pj.used_methods[i] = pkl_pj.used_methods[i]
@@ -4676,6 +4700,7 @@ def unpickle_pj(pickle_file_name, git=True):
     if git:
         start_git(new_pj)
     return new_pj
+
 
 def revert_pickle(pj, commit_hash):
     pickle_filename = pj.pickle_name
