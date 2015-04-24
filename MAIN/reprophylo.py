@@ -40,7 +40,7 @@ if False:
 
 
 from Bio import SeqIO
-import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast, gb_syn
+import os, csv, sys, dendropy, re, time, random, glob, platform, warnings, rpgit, ast, gb_syn,css
 import HTML, inspect, shutil
 import subprocess as sub
 from Bio.Seq import Seq
@@ -849,6 +849,7 @@ def pj_from_nexus_w_charset(nexus_filename, output_dir, char_type,
     if project:
         from reprophylo import Project
         pj = Project(loci_list, pickle=pickle, git=git)
+        i=1
         for f in filenames:
             locus_name = f.split('/')[-1].split('.')[0]
             print '%i/%i reading %s'%(i,len(filenames), locus_name)
@@ -3117,7 +3118,7 @@ class Project:
             draw_boxplot(lengths_dict, 'Seq length (bp)', 'inline')
             
             
-            for stat in ['GC_content', 'nuc_degen_prop', 'prot_degen_prop']:
+            for stat in ['GC_content']:#, 'nuc_degen_prop', 'prot_degen_prop']:
                 title = 'Distribution of sequence statistic \"'+stat+'\"'
                 print title.title()
                 # This will make a dict with loci as keys and a list of stat values as
@@ -4149,7 +4150,8 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     return figs_folder + '/' + name+'.png'
     
 #################################################################################
-def report_methods(pj, figs_folder, output_directory, size='small'):
+def report_methods(pj, figs_folder, output_directory, size='small',
+                   compare_trees=None, compare_meta=None, trees_to_compare='all'):
 #################################################################################
         """
         Main HTML reporting function. This function iterates over the 
@@ -4193,7 +4195,7 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         # it here. Or that get it from the source directory and places it
         # in /files
         
-        css_line = '<link rel="stylesheet" type="text/css" href="files/rp.css">'
+        css_line = '<link rel="stylesheet" type="text/css" href="Bootstrap.css">'
 
         # This list will contain the report lines/ tables as values. We will append
         # each new report line to it
@@ -4223,7 +4225,7 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         
         report_lines += ['<h2>','Data','</h2>', '']
         
-        print "now printing species table"
+        print "starting species table"
         # Species over loci table
         #------------------------------------------------------------------------
         title = 'species representation in sequence data'.title()
@@ -4260,87 +4262,92 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         
         os.remove(outfile_name)
         
-        print "now making sequence statistics plots"        
-        # Sequence statistic plots
-        #------------------------------------------------------------------------
-        title = 'Sequence statistic plots'.title()
-        report_lines += ('<h3>', title, '</h3>', '')
-        
-        # This will plot 4 box plot figures representing the distribution of seq
-        # length, GC content, %ambiguity in nuc and prot seqs for each locus.
-        if len(pj.records_by_locus.keys())>0:
-            
-            # This will determine the with of the figure, 0.5' per locus
-            scale = str(len(pj.records_by_locus.keys())*0.5)
-            
-            # This will make a list of seq length for each locus. Seq length are calced
-            # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
-            # dict with loci names as keys, and lists of SeqReocrd objects as values
-            lengths_dict = {}
-            for locus_name in pj.records_by_locus.keys():
-                lengths_dict[locus_name] = []
-                for record in pj.records_by_locus[locus_name]:
-                    lengths_dict[locus_name].append(len(record.seq))
-            
-            # This draws a box plot of sequence length distributions and puts a png in 
-            # the 'files' directory.
-            fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', '%s/files'%output_directory)
-            
-            
-            # Distribution of sequence lengths
-            #---------------------------------------------------------------------
-            title = 'Distribution of sequence lengths'
-            report_lines += ( '<h4>', title, '</h4>',  '')
-            
-            # This will write the img tag for the seq length boxplot in the report html
-            # The src attribute is the png file path. The commented lines are an alternative
-            # making an embeded figure.
-            if os.path.isfile(fig_filename):
-                #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
-                img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
-                report_lines.append(img_tag)
-                #os.remove(fig_filename)
-            
-            
-            # This will make GC content, nuc_degen_prop and prot_degen_prop png file,
-            # will put them in the /files subdirectory and will write the html sections
-            # for them, including img tags. All three params are feature qualifiers of
-            # SeqRecord objects found in pj.records, which is a list. 
-            for stat in ('GC_content', 'nuc_degen_prop', 'prot_degen_prop'):
-                # This will make a dict with loci as keys and a list of stat values as
-                # dict values.
-                stat_dict = {}
-                ylabel = 'GC ontent (%)'
-                if not stat == 'GC_content':
-                    ylabel = 'Ambiguous positions (prop)'
+        if not size == 'small':
+            print "starting sequence statistics plots"        
+            # Sequence statistic plots
+            #------------------------------------------------------------------------
+            title = 'Sequence statistic plots'.title()
+            report_lines += ('<h3>', title, '</h3>', '')
+
+            # This will plot 4 box plot figures representing the distribution of seq
+            # length, GC content, %ambiguity in nuc and prot seqs for each locus.
+            if len(pj.records_by_locus.keys())>0:
+
+                # This will determine the with of the figure, 0.5' per locus
+                scale = str(len(pj.records_by_locus.keys())*0.5)
+
+                # This will make a list of seq length for each locus. Seq length are calced
+                # using the record.seq in 'pj.records_by_locus'. 'pj.records_by_locus is a
+                # dict with loci names as keys, and lists of SeqReocrd objects as values
+                lengths_dict = {}
                 for locus_name in pj.records_by_locus.keys():
-                    stat_dict[locus_name] = []
-                    for i in pj.records_by_locus[locus_name]:
-                        for record in pj.records:
-                            for feature in record.features:
-                                if feature.qualifiers['feature_id'][0] == i.id:
-                                    if stat in feature.qualifiers.keys():
-                                        stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
-                
-                # This will make the boxplot png and will put in in the /files subdirectory
-                fig_filename = draw_boxplot(stat_dict, ylabel, '%s/files'%output_directory)
-                
-                # Distribution of stat
+                    lengths_dict[locus_name] = []
+                    for record in pj.records_by_locus[locus_name]:
+                        lengths_dict[locus_name].append(len(record.seq))
+
+                # This draws a box plot of sequence length distributions and puts a png in 
+                # the 'files' directory.
+                if not size == 'small':
+                    fig_filename = draw_boxplot(lengths_dict, 'Seq length (bp)', '%s/files'%output_directory)
+
+
+                # Distribution of sequence lengths
                 #---------------------------------------------------------------------
-                title = 'Distribution of sequence statistic \"'+stat+'\"'
-                report_lines += ( '<h4>', title, '</h4>', '')
-                
-                # This will make the img tag using the png path as src. The commented lines are an alternative
-                # making an embeded image
-                if os.path.isfile(fig_filename):
+                title = 'Distribution of sequence lengths'
+                report_lines += ( '<h4>', title, '</h4>',  '')
+
+                # This will write the img tag for the seq length boxplot in the report html
+                # The src attribute is the png file path. The commented lines are an alternative
+                # making an embeded figure.
+                if not size=='small' and os.path.isfile(fig_filename):
                     #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
-                    img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
                     #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                    img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
                     report_lines.append(img_tag)
                     #os.remove(fig_filename)
+
+
+                # This will make GC content, nuc_degen_prop and prot_degen_prop png file,
+                # will put them in the /files subdirectory and will write the html sections
+                # for them, including img tags. All three params are feature qualifiers of
+                # SeqRecord objects found in pj.records, which is a list.
+                stats_to_plot = ('GC_content', 'nuc_degen_prop', 'prot_degen_prop')
+                if size=='small':
+                    stats_to_plot = ()
+                for stat in stats_to_plot:
+                    # This will make a dict with loci as keys and a list of stat values as
+                    # dict values.
+                    stat_dict = {}
+                    ylabel = 'GC ontent (%)'
+                    if not stat == 'GC_content':
+                        ylabel = 'Ambiguous positions (prop)'
+                    for locus_name in pj.records_by_locus.keys():
+                        stat_dict[locus_name] = []
+                        for i in pj.records_by_locus[locus_name]:
+                            for record in pj.records:
+                                for feature in record.features:
+                                    if feature.qualifiers['feature_id'][0] == i.id:
+                                        if stat in feature.qualifiers.keys():
+                                            stat_dict[locus_name].append(float(feature.qualifiers[stat][0]))
+
+                    # This will make the boxplot png and will put in in the /files subdirectory
+                    fig_filename = draw_boxplot(stat_dict, ylabel, '%s/files'%output_directory)
+
+                    # Distribution of stat
+                    #---------------------------------------------------------------------
+                    title = 'Distribution of sequence statistic \"'+stat+'\"'
+                    report_lines += ( '<h4>', title, '</h4>', '')
+
+                    # This will make the img tag using the png path as src. The commented lines are an alternative
+                    # making an embeded image
+                    if os.path.isfile(fig_filename):
+                        #data_uri = open(fig_filename, 'rb').read().encode('base64').replace('\n', '')
+                        img_tag = '<img src="%s">'%(fig_filename.partition('/')[-1])
+                        #img_tag = '<img height=400 width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                        report_lines.append(img_tag)
+                        #os.remove(fig_filename)
                 
-        print "now reporting concatenations"
+        print "starting concatenations"
         # Description of data concatenations
         #------------------------------------------------------------------------
         title = 'Description of data concatenations'.title()
@@ -4368,9 +4375,10 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
             for locus in c.otu_must_have_all_of:
                 rule_1 += locus + ', '
             report_lines.append(rule_1)
-            rule_2 = 'OTUs must have at least one of each group: '
+            rule_2 = '<pre>'
             for group in c.otu_must_have_one_of:
-                rule_2 += str(group) +', '
+                rule_2 += '</pre>OTUs must have at least one of the following loci: \n<pre>'
+                rule_2 += str(group).replace('[','').replace(']','') +'</pre>\n'
             report_lines += (rule_2, '')
             
             # This are the otus and loci names in the concatenation. c.feature_id_dict
@@ -4438,7 +4446,7 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         # them back to 'Conf' objects that can be rerun.
         report_lines += ['', '<h2>','Methods','</h2>', '']
         
-        print "now reporting methods"
+        print "starting methods"
         for method in pj.used_methods:
             # This will print list representations of the 'Conf' objects
             title = str(pj.used_methods[method]).split('\n')[0]
@@ -4451,7 +4459,7 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         #############################  section 3:   RESULTS  #######################
         
         report_lines += ['', '<h2>','Results','</h2>', '']
-        print "now reporting alignment statistics"
+        print "starting alignment statistics"
         # Global alignmnet statistics
         #------------------------------------------------------------------------
         title = 'Global alignmnet statistics'.title()
@@ -4557,29 +4565,32 @@ def report_methods(pj, figs_folder, output_directory, size='small'):
         else:
             report_lines += ['No trimmed alignments, or too many, in this project','']
         
-        print "making RF matrix"
-        title = 'Robinson-Foulds distances'.title()
-        report_lines += ('<h3>', title, '</h3>', '')
-        
-        if len(pj.trees.keys())>1:
-            try:
-                RF_filename, legend = calc_rf(pj, '%s/files'%output_directory)
-                scale = str(len(legend)*60)
-                if os.path.isfile(RF_filename):
-                        #data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
-                        #img_tag = '<img height='+scale+' width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
-                        img_tag = '<img src="%s">'%(RF_filename.partition('/')[-1])
-                        report_lines.append(img_tag)
-                        #os.remove(RF_filename)
-                
-                report_lines.append('<h3>Legend<h3><pre>')
-                report_lines += legend
-                report_lines.append('</pre>')
-            except:
-                report_lines += ['Found unrooted tree(s), skipping RF distance calculation']
+        print "starting RF matrix(ces)"
+        for rf_type in compare_trees:
+            title = 'Robinson-Foulds distances (%s)'%rf_type.title()
+            report_lines += ('<h3>', title, '</h3>', '')
 
-        else:
-            report_lines += ['Less than two trees in this Project','']
+            if len(pj.trees.keys())>1:
+                try:
+                    RF_filename, legend = calc_rf(pj, '%s/files'%output_directory,
+                                                  rf_type=rf_type, meta=compare_meta, trees=trees_to_compare)
+                    scale = str(len(legend)*60)
+                    if os.path.isfile(RF_filename):
+                            #data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
+                            #img_tag = '<img height='+scale+' width='+scale+' src="data:image/png;base64,{0}">'.format(data_uri)
+                            img_tag = '<img src="%s">'%(RF_filename.partition('/')[-1])
+                            report_lines.append(img_tag)
+                            #os.remove(RF_filename)
+
+                    report_lines+=['<h3>Legend<h3>','']
+                    report_lines += [HTML.table( legend[1:], 
+                                               header_row=legend[0])]
+                    report_lines.append('')
+                except:
+                    report_lines += ['Skipping RF distance calculation']
+
+            else:
+                report_lines += ['Less than two trees in this Project','']
 
                 
         #############################  section 4:   TREES  #######################
@@ -4721,7 +4732,8 @@ def revert_pickle(pj, commit_hash):
     
 
 
-def publish(pj, folder_name, figures_folder, size='small'):
+def publish(pj, folder_name, figures_folder, size='small',
+            compare_trees=None, compare_meta=None, trees_to_compare='all'):
     
     import os, time
     folder = None
@@ -4740,7 +4752,9 @@ def publish(pj, folder_name, figures_folder, size='small'):
     pj.write(folder+'/tree_and_alns.nexml','nexml')
     pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
-    lines = report_methods(pj, figures_folder, folder_name, size)
+    lines = report_methods(pj, figures_folder, folder_name, size,
+                           compare_trees=compare_trees, compare_meta=compare_meta,
+                          trees_to_compare=trees_to_compare)
     for line in lines:
         report.write(line + '\n')
     report.close()
@@ -4756,7 +4770,10 @@ def publish(pj, folder_name, figures_folder, size='small'):
     print "pickling"
     pickle_name = time.strftime("%a_%d_%b_%Y_%X", time.gmtime())+'.pkl'
     pickle_pj(pj, folder + '/' + pickle_name)
-
+    
+    hndl = open("%s/Bootstrap.css"%folder, 'wt')
+    hndl.write(css.css())
+    hndl.close()
     
     import zipfile, shutil
     print "archiving"
@@ -4768,13 +4785,117 @@ def publish(pj, folder_name, figures_folder, size='small'):
     zf.close()
     shutil.rmtree(folder)
     print "report ready"
-    
-def calc_rf(pj, figs_folder):
-    meta = 'feature_id'
-    if len(pj.concatenations) > 0:
-        meta = pj.concatenations[0].otu_meta
 
-    trees = pj.trees.keys()
+##################################################
+if False:
+    """ Robinson Foulds Pairwise tree distances"""
+##################################################
+
+
+# These will allow to do an RF distance to dendropy, where branch lengths
+# are considered, but also to correct the branch length by the tree length
+# and thus compare trees with very different evolutionary rates.
+
+def get_tree_length(t):
+    tree_length = 0
+    for n in t.traverse():
+        tree_length += n.dist
+    return tree_length
+    
+def correct_branch_length_by_tree_length(branch_length, tree_length):
+    return branch_length/float(tree_length)
+
+def get_corrected_blen_dif(cor_blen1, cor_blen2):
+    return abs(cor_blen1-cor_blen2)
+    
+def get_corrected_blen_rf(t1, t2):
+    """
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> t2 = Tree("(A:0.3,(D:0.226,((C:0.784,B:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    
+    Trees are the same:
+    >>> T1 = T2 = t1
+    >>> get_corrected_blen_rf(T1,T2)
+    0.0
+    
+    Trees are different:
+    >>> get_corrected_blen_rf(t1,t2)
+    0.877744510978044
+    
+    Dendropy calc of these trees' RF:
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> dt2 = dendropy.Tree.get_from_string(t2.write(), schema="newick")
+    >>> dt1.robinson_foulds_distance(dt2)
+    3.652
+    
+    They are the same and blengths are 25% shorter in second tree. This function gives almost 0
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> t1_prop = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> for n in t1_prop.traverse():
+    ...    n.dist = 0.75*n.dist
+    >>> get_corrected_blen_rf(t1,t1_prop)
+    2.42861286636753e-17
+    
+    Dendropy gives almost 1 for the same trees:
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> dt1_prop = dendropy.Tree.get_from_string(t1_prop.write(), schema="newick")
+    >>> dt1.robinson_foulds_distance(dt1_prop)
+    0.9769999999999999
+    
+    So dendropy RF reflects tree length differences, this function cleans them out.
+    
+    One branch length changes in one tree, topology stays the same:
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.001,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> get_corrected_blen_rf(t1,t1_prop)
+    0.18227475281994168
+    
+    Same trees (same topology, different branch-lengths) in ete's RF:
+    >>> rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t1_prop)
+    >>> rf
+    0
+    
+    The raw rf calc in ete (the starting point of this func) does not reflect any 
+    branch length differences, proportional or otherwise.
+    """
+    rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t2)
+    tree_length1 = get_tree_length(t1)
+    tree_length2 = get_tree_length(t2)
+    distance = 0
+    for part in parts_t1:
+        if not part in parts_t2:
+            raw_blen = t1.get_common_ancestor(part).dist
+            distance += correct_branch_length_by_tree_length(raw_blen, tree_length1)
+        elif part in parts_t2:
+            raw_blen1 = t1.get_common_ancestor(part).dist
+            raw_blen2 = t2.get_common_ancestor(part).dist
+            cor_blen1 = correct_branch_length_by_tree_length(raw_blen1, tree_length1)
+            cor_blen2 = correct_branch_length_by_tree_length(raw_blen2, tree_length2)
+            distance += get_corrected_blen_dif(cor_blen1, cor_blen2)
+    for part in parts_t2:
+        if not part in parts_t1:
+            raw_blen = t2.get_common_ancestor(part).dist
+            distance += correct_branch_length_by_tree_length(raw_blen, tree_length2)
+            
+    return distance
+            
+            
+        
+def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all'):
+    """
+    rf_types:
+    topology: only topological diff
+    branch-length: branch-length diffs
+    proportional: branch-length proportion out of tree length diff
+    deep-more-important: to-do
+    """
+    if len(pj.concatenations) > 0 and not meta:
+        meta = pj.concatenations[0].otu_meta
+    elif not meta:
+        raise RuntimeError('RF calc does not know which meta to use to compare leaves')
+
+    if trees == 'all':
+        trees = pj.trees.keys()
 
     data = []
 
@@ -4786,6 +4907,7 @@ def calc_rf(pj, figs_folder):
                 for feature in record.features:
                     if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                         l.name = feature.qualifiers[meta][0]
+        dupT1d = dendropy.Tree.get_from_string(dupT1.write(), schema="newick")
         for t2 in trees:
             dupT2 = Tree(pj.trees[t2][0].write())
             for l in dupT2:
@@ -4793,18 +4915,27 @@ def calc_rf(pj, figs_folder):
                     for feature in record.features:
                         if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                             l.name = feature.qualifiers[meta][0]
-            rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2)        
-            line.append(rf/float(max_rf))        
+            dupT2d = dendropy.Tree.get_from_string(dupT2.write(), schema="newick")
+            if rf_type=='branch-length':
+                rf = dupT1d.robinson_foulds_distance(dupT2d)
+                line.append(rf) 
+            elif rf_type=='topology':
+                rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2)
+                line.append(rf/float(max_rf))   
+            elif rf_type == 'proportional':
+                line.append(get_corrected_blen_rf(dupT1, dupT2))
+            #to do
+            #elif rf_type == deep_nodes more important:
+            #    line.append(get_deep_important_rf(dupT1, dupT2))
         data.append(line)   
     
-    row_labels = [str(i) for i in range(len(trees))]
+    row_labels = [str(i) for i in range(1, len(trees)+1)]
     column_labels = row_labels
-    legend = ['#'.ljust(10,' ')+'LOCUS'.ljust(20,' ')+'ALIGNMENT METHOD'.ljust(20,' ')+
-              'TRIMMING METHOD'.ljust(20,' ')+'TREE METHOD'.ljust(20,' ')]
+    legend = [['#','LOCUS','ALIGNMENT METHOD','TRIMMING METHOD','TREE METHOD']]
     for i in trees:
-        line = str(trees.index(i)).ljust(10,' ')
+        line = [str(trees.index(i)+1)]
         for val in i.split('@'):
-            line += val.ljust(20,' ')
+            line.append(val)
         legend.append(line)
     fig, ax = plt.subplots()
     data = np.array(data)
