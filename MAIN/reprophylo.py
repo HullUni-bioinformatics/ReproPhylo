@@ -5278,18 +5278,18 @@ def parse_ryo(exo_results):
     """parses exonerate results that include the ryo line above"""
     
     stats = []
-    ryos = [i.split("ENDRYO")[0] for i in exo_results.split('STARTRYO')[1:]][1:]
+    ryos = [i.split("ENDRYO")[0] for i in exo_results.split('STARTRYO')[1:]][:-1]
     if len(ryos) > 0:
         for i in ryos:
             a = {}
             for line in i.split('@!!@!!@'):
                 k, v = [line.partition('=')[0], line.partition('=')[2]]
                 a[k.strip().rstrip()] = v.strip().rstrip()
-            stats.append(a)
             a['qfull'] = a['qfull'].replace('\n','').replace("\s",'')
             a['qcds'] = a['qcds'].replace('\n','').replace("\s",'')
             a['tfull'] = a['tfull'].replace('\n','').replace("\s",'')
             a['tcds'] = a['tcds'].replace('\n','').replace("\s",'')
+            stats.append(a)
             
     return stats
 
