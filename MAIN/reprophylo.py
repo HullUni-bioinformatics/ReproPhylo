@@ -4151,7 +4151,8 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     
 #################################################################################
 def report_methods(pj, figs_folder, output_directory, size='small',
-                   compare_trees=None, compare_meta=None, trees_to_compare='all'):
+                   compare_trees=None, compare_meta=None, trees_to_compare='all',
+                   unrooted_trees=False):
 #################################################################################
         """
         Main HTML reporting function. This function iterates over the 
@@ -4573,7 +4574,8 @@ def report_methods(pj, figs_folder, output_directory, size='small',
             if len(pj.trees.keys())>1:
                 try:
                     RF_filename, legend = calc_rf(pj, '%s/files'%output_directory,
-                                                  rf_type=rf_type, meta=compare_meta, trees=trees_to_compare)
+                                                  rf_type=rf_type, meta=compare_meta, trees=trees_to_compare,
+                                                  unrooted_trees=unrooted_trees)
                     scale = str(len(legend)*60)
                     if os.path.isfile(RF_filename):
                             #data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
@@ -4733,7 +4735,8 @@ def revert_pickle(pj, commit_hash):
 
 
 def publish(pj, folder_name, figures_folder, size='small',
-            compare_trees=None, compare_meta=None, trees_to_compare='all'):
+            compare_trees=None, compare_meta=None, trees_to_compare='all',
+            unrooted_trees=False):
     
     import os, time
     folder = None
@@ -4754,7 +4757,7 @@ def publish(pj, folder_name, figures_folder, size='small',
     report = open(folder+'/report.html','wt')
     lines = report_methods(pj, figures_folder, folder_name, size,
                            compare_trees=compare_trees, compare_meta=compare_meta,
-                          trees_to_compare=trees_to_compare)
+                          trees_to_compare=trees_to_compare, unrooted_trees=unrooted_trees)
     for line in lines:
         report.write(line + '\n')
     report.close()
@@ -4799,7 +4802,8 @@ if False:
 def get_tree_length(t):
     tree_length = 0
     for n in t.traverse():
-        tree_length += n.dist
+        if not n.dist == 1: # ete puts 1 if there is no blen
+            tree_length += n.dist
     return tree_length
     
 def correct_branch_length_by_tree_length(branch_length, tree_length):
@@ -4808,7 +4812,21 @@ def correct_branch_length_by_tree_length(branch_length, tree_length):
 def get_corrected_blen_dif(cor_blen1, cor_blen2):
     return abs(cor_blen1-cor_blen2)
     
-def get_corrected_blen_rf(t1, t2):
+def flatten_to_strings(listOfLists):
+    """Flatten a list of (lists of (lists of strings)) for any level 
+    of nesting"""
+    result = []
+
+    for i in listOfLists:
+        # Only append if i is a basestring (superclass of string)
+        if isinstance(i, basestring):
+            result.append(i)
+        # Otherwise call this function recursively
+        else:
+            result.extend(flatten_to_strings(i))
+    return result
+    
+def get_corrected_blen_rf(t1, t2, unrooted_trees=False):
     """
     >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
     >>> t2 = Tree("(A:0.3,(D:0.226,((C:0.784,B:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
@@ -4820,7 +4838,7 @@ def get_corrected_blen_rf(t1, t2):
     
     Trees are different:
     >>> get_corrected_blen_rf(t1,t2)
-    0.877744510978044
+    0.504654255319149
     
     Dendropy calc of these trees' RF:
     >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
@@ -4832,15 +4850,21 @@ def get_corrected_blen_rf(t1, t2):
     >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
     >>> t1_prop = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
     >>> for n in t1_prop.traverse():
-    ...    n.dist = 0.75*n.dist
+    ...    if not n.dist == 1:
+    ...        n.dist = 0.75*n.dist
     >>> get_corrected_blen_rf(t1,t1_prop)
-    2.42861286636753e-17
+    6.938893903907228e-17
+    
+    >>> str1 = "(A:1.1,((B:1.1,C:1.1):1.1,(D:1.1,E:1.1):1.1):1.1);"
+    >>> str2 = "(A:2.2,((B:2.2,C:2.2):2.2,(D:2.2,E:2.2):2.2):2.2);"
+    >>> get_corrected_blen_rf(Tree(str1), Tree(str2))
+    0.0
     
     Dendropy gives almost 1 for the same trees:
     >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
     >>> dt1_prop = dendropy.Tree.get_from_string(t1_prop.write(), schema="newick")
     >>> dt1.robinson_foulds_distance(dt1_prop)
-    0.9769999999999999
+    0.7269999999999999
     
     So dendropy RF reflects tree length differences, this function cleans them out.
     
@@ -4848,7 +4872,7 @@ def get_corrected_blen_rf(t1, t2):
     >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.001,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
     >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
     >>> get_corrected_blen_rf(t1,t1_prop)
-    0.18227475281994168
+    0.23503571001673468
     
     Same trees (same topology, different branch-lengths) in ete's RF:
     >>> rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t1_prop)
@@ -4858,30 +4882,39 @@ def get_corrected_blen_rf(t1, t2):
     The raw rf calc in ete (the starting point of this func) does not reflect any 
     branch length differences, proportional or otherwise.
     """
-    rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t2)
+    rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t2, unrooted_trees=unrooted_trees)
+    #print 'DEBUG:', parts_t1
+    #print 'DEBUG:', parts_t2
     tree_length1 = get_tree_length(t1)
     tree_length2 = get_tree_length(t2)
     distance = 0
     for part in parts_t1:
         if not part in parts_t2:
-            raw_blen = t1.get_common_ancestor(part).dist
-            distance += correct_branch_length_by_tree_length(raw_blen, tree_length1)
+            raw_blen = t1.get_common_ancestor(flatten_to_strings(part)).dist
+            if not raw_blen==1.0:
+                distance += correct_branch_length_by_tree_length(raw_blen, tree_length1)
         elif part in parts_t2:
-            raw_blen1 = t1.get_common_ancestor(part).dist
-            raw_blen2 = t2.get_common_ancestor(part).dist
+            #print 'DEBUG:', part
+            raw_blen1 = t1.get_common_ancestor(flatten_to_strings(part)).dist
+            raw_blen2 = t2.get_common_ancestor(flatten_to_strings(part)).dist
+            if raw_blen1==1:
+                raw_blen1 = 0
+            if raw_blen2==1:
+                raw_blen2 = 0
             cor_blen1 = correct_branch_length_by_tree_length(raw_blen1, tree_length1)
             cor_blen2 = correct_branch_length_by_tree_length(raw_blen2, tree_length2)
             distance += get_corrected_blen_dif(cor_blen1, cor_blen2)
     for part in parts_t2:
         if not part in parts_t1:
-            raw_blen = t2.get_common_ancestor(part).dist
-            distance += correct_branch_length_by_tree_length(raw_blen, tree_length2)
+            raw_blen = t2.get_common_ancestor(flatten_to_strings(part)).dist
+            if not raw_blen==1:
+                distance += correct_branch_length_by_tree_length(raw_blen, tree_length2)
             
     return distance
             
             
         
-def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all'):
+def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unrooted_trees=False):
     """
     rf_types:
     topology: only topological diff
@@ -4920,10 +4953,10 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all'):
                 rf = dupT1d.robinson_foulds_distance(dupT2d)
                 line.append(rf) 
             elif rf_type=='topology':
-                rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2)
+                rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2, unrooted_trees=unrooted_trees)
                 line.append(rf/float(max_rf))   
             elif rf_type == 'proportional':
-                line.append(get_corrected_blen_rf(dupT1, dupT2))
+                line.append(get_corrected_blen_rf(dupT1, dupT2, unrooted_trees=unrooted_trees))
             #to do
             #elif rf_type == deep_nodes more important:
             #    line.append(get_deep_important_rf(dupT1, dupT2))
@@ -5791,9 +5824,24 @@ class LociStats:
     
     def __init__(self, pj, trimmed=True, alignmnet_method=None, trimming_method=None):
         
+        """
+        >>> from reprophylo import *
+        >>> pj = unpickle_pj('test-data/test_locistats', git=False)
+        >>> stats = LociStats(pj)
+        >>> entropies = stats.entropies['dummy@ReadDirectly@no_trim']
+        >>> stats.sort()
+        >>> np.percentile(entropies,25)
+        0.0
+        >>> np.percentile(entropies,50)
+        0.0
+        >>> conservation = stats.conservations['dummy1@ReadDirectly@no_trim']
+        >>> np.percentile(conservation,25)
+        0.0017470471212500001
+        """
+        
         self.loci = pj.loci
         
-        self.entropeis = get_entropies(pj,
+        self.entropies = get_entropies(pj,
                                        trimmed = trimmed,
                                        alignmnet_method=alignmnet_method,
                                        trimming_method=trimming_method)
@@ -5817,7 +5865,7 @@ class LociStats:
         for key in self.sequence_lengths:
             locus_stats = [key]
             
-            entropies = [self.entropeis[i] for i in self.entropeis.keys() if i.split('@')[0] == key][0]
+            entropies = [self.entropies[i] for i in self.entropies.keys() if i.split('@')[0] == key][0]
             gapscores = [self.gapscores[i] for i in self.gapscores.keys() if i.split('@')[0] == key][0]
             conservations = [self.conservations[i] for i in self.conservations.keys() if i.split('@')[0] == key][0]
             
