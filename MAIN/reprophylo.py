@@ -4910,11 +4910,12 @@ def get_corrected_blen_rf(t1, t2, unrooted_trees=False):
             if not raw_blen==1:
                 distance += correct_branch_length_by_tree_length(raw_blen, tree_length2)
             
+    #print "Debug: distance: %s"%str(distance)
     return distance
             
             
         
-def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unrooted_trees=False):
+def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, mp_root=False, trees='all', unrooted_trees=False):
     """
     rf_types:
     topology: only topological diff
@@ -4926,6 +4927,7 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unro
         meta = pj.concatenations[0].otu_meta
     elif not meta:
         raise RuntimeError('RF calc does not know which meta to use to compare leaves')
+        
 
     if trees == 'all':
         trees = pj.trees.keys()
@@ -4940,6 +4942,9 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unro
                 for feature in record.features:
                     if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                         l.name = feature.qualifiers[meta][0]
+        if mp_root:
+            R=dupT1.get_midpoint_outgroup()
+            dupT1.set_outgroup(R)
         dupT1d = dendropy.Tree.get_from_string(dupT1.write(), schema="newick")
         for t2 in trees:
             dupT2 = Tree(pj.trees[t2][0].write())
@@ -4948,6 +4953,9 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unro
                     for feature in record.features:
                         if feature.qualifiers['feature_id'][0] == l.name and meta in feature.qualifiers.keys():
                             l.name = feature.qualifiers[meta][0]
+            if mp_root:
+                R=dupT2.get_midpoint_outgroup()
+                dupT2.set_outgroup(R)
             dupT2d = dendropy.Tree.get_from_string(dupT2.write(), schema="newick")
             if rf_type=='branch-length':
                 rf = dupT1d.robinson_foulds_distance(dupT2d)
@@ -4985,7 +4993,10 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, trees='all', unro
     ax.set_xticklabels(row_labels, minor=False, size=14, rotation='vertical')
     ax.set_yticklabels(column_labels, minor=False, size=14)
     #fig.set_size_inches(12.5,12.5)
-    fig.colorbar(heatmap, cmap=plt.cm.Blues)
+    try:
+        fig.colorbar(heatmap, cmap=plt.cm.Blues)
+    except:
+        pass
     name = str(random.randint(1000,2000))
     fig.savefig(figs_folder + '/' + name +'.png')
     close('all')
