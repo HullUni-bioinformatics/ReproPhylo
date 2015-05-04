@@ -4696,12 +4696,11 @@ def unpickle_pj(pickle_file_name, git=True):
 
     elif isinstance(pkl_pj.used_methods, list) and len(pkl_pj.used_methods) > 0:
         temp = {}
-        if isinstance(pkl_pj.used_methods[0], basestring):
-            for m in pkl_pj.used_methods:
+        for m in pkl_pj.used_methods:
+            if isinstance(m, basestring):
                 name = m.split()[1]
                 temp[name] = m
-        elif not isinstance(pkl_pj.used_methods[0], basestring):
-            for m in pkl_pj.used_methods:
+            elif not isinstance(m, basestring):
                 temp[m.method_name] = m
         pkl_pj.used_methods = temp
     
