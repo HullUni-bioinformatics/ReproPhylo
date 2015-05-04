@@ -4696,18 +4696,18 @@ def unpickle_pj(pickle_file_name, git=True):
 
     elif isinstance(pkl_pj.used_methods, list) and len(pkl_pj.used_methods) > 0:
         temp = {}
-        if isinstance(pkl_pj.used_methods[0], str):
+        if isinstance(pkl_pj.used_methods[0], basestring):
             for m in pkl_pj.used_methods:
                 name = m.split()[1]
                 temp[name] = m
-        elif not isinstance(pkl_pj.used_methods[0], str):
+        elif not isinstance(pkl_pj.used_methods[0], basestring):
             for m in pkl_pj.used_methods:
                 temp[m.method_name] = m
         pkl_pj.used_methods = temp
     
     # Turn Confs to strings
     for i in pkl_pj.used_methods:
-        if isinstance(pkl_pj.used_methods[i], str):
+        if isinstance(pkl_pj.used_methods[i], basestring):
             new_pj.used_methods[i] = pkl_pj.used_methods[i]
         else:
             new_pj.used_methods[i] = str(pkl_pj.used_methods[i])
