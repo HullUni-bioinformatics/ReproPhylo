@@ -4152,7 +4152,7 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
 #################################################################################
 def report_methods(pj, figs_folder, output_directory, size='small',
                    compare_trees=None, compare_meta=None, trees_to_compare='all',
-                   unrooted_trees=False):
+                   unrooted_trees=False, mp_root=True):
 #################################################################################
         """
         Main HTML reporting function. This function iterates over the 
@@ -4575,7 +4575,7 @@ def report_methods(pj, figs_folder, output_directory, size='small',
                 try:
                     RF_filename, legend = calc_rf(pj, '%s/files'%output_directory,
                                                   rf_type=rf_type, meta=compare_meta, trees=trees_to_compare,
-                                                  unrooted_trees=unrooted_trees)
+                                                  unrooted_trees=unrooted_trees, mp_root=mp_root)
                     scale = str(len(legend)*60)
                     if os.path.isfile(RF_filename):
                             #data_uri = open(RF_filename, 'rb').read().encode('base64').replace('\n', '')
@@ -4973,6 +4973,7 @@ def get_corrected_kuhner_felsenstein(t1, t2, unrooted_trees=False):
     branch length differences, proportional or otherwise.
     """
     from math import pow
+    #print 'DEBUG: in kuhner_felsenstein'
     rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t2, unrooted_trees=unrooted_trees)
     #print 'DEBUG:', parts_t1
     #print 'DEBUG:', parts_t2
@@ -5053,6 +5054,7 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, mp_root=False, tr
                 rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2, unrooted_trees=unrooted_trees)
                 line.append(rf/float(max_rf))   
             elif rf_type == 'proportional':
+                #print 'DEBUG: in proportional'
                 warnings.warn('Trees must have the same taxa')
                 line.append(get_corrected_kuhner_felsenstein(dupT1, dupT2, unrooted_trees=unrooted_trees))
             #to do
