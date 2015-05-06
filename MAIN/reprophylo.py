@@ -4810,6 +4810,10 @@ def correct_branch_length_by_tree_length(branch_length, tree_length):
 
 def get_corrected_blen_dif(cor_blen1, cor_blen2):
     return abs(cor_blen1-cor_blen2)
+
+def get_corrected_blen_dif_s(cor_blen1, cor_blen2):
+    from math import pow
+    return pow((cor_blen1-cor_blen2),2)
     
 def flatten_to_strings(listOfLists):
     """Flatten a list of (lists of (lists of strings)) for any level 
@@ -4912,7 +4916,93 @@ def get_corrected_blen_rf(t1, t2, unrooted_trees=False):
     #print "Debug: distance: %s"%str(distance)
     return distance
             
+def get_corrected_kuhner_felsenstein(t1, t2, unrooted_trees=False):
+    """
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> t2 = Tree("(A:0.3,(D:0.226,((C:0.784,B:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    
+    Trees are the same:
+    >>> T1 = T2 = t1
+    >>> get_corrected_kuhner_felsenstein(T1,T2)
+    0.0
+    
+    Trees are different:
+    >>> get_corrected_kuhner_felsenstein(t1,t2)
+    0.1273379587058624
+    
+    Dendropy calc of these trees' RF:
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> dt2 = dendropy.Tree.get_from_string(t2.write(), schema="newick")
+    >>> dt1.robinson_foulds_distance(dt2)
+    3.652
+    
+    They are the same and blengths are 25% shorter in second tree. This function gives almost 0
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> t1_prop = Tree("(A:0.3,(B:0.226,((C:0.784,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> for n in t1_prop.traverse():
+    ...    if not n.dist == 1:
+    ...        n.dist = 0.75*n.dist
+    >>> get_corrected_kuhner_felsenstein(t1,t1_prop)
+    3.274080905458301e-33
+    
+    >>> str1 = "(A:1.1,((B:1.1,C:1.1):1.1,(D:1.1,E:1.1):1.1):1.1);"
+    >>> str2 = "(A:2.2,((B:2.2,C:2.2):2.2,(D:2.2,E:2.2):2.2):2.2);"
+    >>> get_corrected_kuhner_felsenstein(Tree(str1), Tree(str2))
+    0.0
+    
+    Dendropy gives almost 1 for the same trees:
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> dt1_prop = dendropy.Tree.get_from_string(t1_prop.write(), schema="newick")
+    >>> dt1.robinson_foulds_distance(dt1_prop)
+    0.7269999999999999
+    
+    So dendropy RF reflects tree length differences, this function cleans them out.
+    
+    One branch length changes in one tree, topology stays the same:
+    >>> t1 = Tree("(A:0.3,(B:0.226,((C:0.001,D:0.159):0.759,(e:0.03,f:0.1):0.25)):0.3):0.1;")
+    >>> dt1 = dendropy.Tree.get_from_string(t1.write(), schema="newick")
+    >>> get_corrected_kuhner_felsenstein(t1,t1_prop)
+    0.010930167133307158
+    
+    Same trees (same topology, different branch-lengths) in ete's RF:
+    >>> rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t1_prop)
+    >>> rf
+    0
+    
+    The raw rf calc in ete (the starting point of this func) does not reflect any 
+    branch length differences, proportional or otherwise.
+    """
+    from math import pow
+    rf, max_rf, common_leaves, parts_t1, parts_t2 = t1.robinson_foulds(t2, unrooted_trees=unrooted_trees)
+    #print 'DEBUG:', parts_t1
+    #print 'DEBUG:', parts_t2
+    tree_length1 = get_tree_length(t1)
+    tree_length2 = get_tree_length(t2)
+    distance = 0
+    for part in parts_t1:
+        if not part in parts_t2:
+            raw_blen = t1.get_common_ancestor(flatten_to_strings(part)).dist
+            if not raw_blen==1.0:
+                distance += pow(correct_branch_length_by_tree_length(raw_blen, tree_length1),2)
+        elif part in parts_t2:
+            #print 'DEBUG:', part
+            raw_blen1 = t1.get_common_ancestor(flatten_to_strings(part)).dist
+            raw_blen2 = t2.get_common_ancestor(flatten_to_strings(part)).dist
+            if raw_blen1==1:
+                raw_blen1 = 0
+            if raw_blen2==1:
+                raw_blen2 = 0
+            cor_blen1 = correct_branch_length_by_tree_length(raw_blen1, tree_length1)
+            cor_blen2 = correct_branch_length_by_tree_length(raw_blen2, tree_length2)
+            distance += get_corrected_blen_dif_s(cor_blen1, cor_blen2)
+    for part in parts_t2:
+        if not part in parts_t1:
+            raw_blen = t2.get_common_ancestor(flatten_to_strings(part)).dist
+            if not raw_blen==1:
+                distance += pow(correct_branch_length_by_tree_length(raw_blen, tree_length2),2)
             
+    #print "Debug: distance: %s"%str(distance)
+    return distance            
         
 def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, mp_root=False, trees='all', unrooted_trees=False):
     """
@@ -4963,7 +5053,8 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, mp_root=False, tr
                 rf, max_rf, common_leaves, parts_t1, parts_t2 = dupT1.robinson_foulds(dupT2, unrooted_trees=unrooted_trees)
                 line.append(rf/float(max_rf))   
             elif rf_type == 'proportional':
-                line.append(get_corrected_blen_rf(dupT1, dupT2, unrooted_trees=unrooted_trees))
+                warnings.warn('Trees must have the same taxa')
+                line.append(get_corrected_kuhner_felsenstein(dupT1, dupT2, unrooted_trees=unrooted_trees))
             #to do
             #elif rf_type == deep_nodes more important:
             #    line.append(get_deep_important_rf(dupT1, dupT2))
