@@ -4752,6 +4752,23 @@ def publish(pj, folder_name, figures_folder, size='small',
     
     os.makedirs(folder)
     pj.write(folder+'/tree_and_alns.nexml','nexml')
+    
+    os.mkdir(folder+'/fasta_alignments')
+    file_names = pj.write_alns(id=['feature_id','original_id'])
+    for f in file_names:
+        os.rename(f, "%s/fasta_alignments/%s"%(folder,f))
+        
+    os.mkdir(folder+'/trimmed_fasta_alignments')
+    file_names = pj.write_alns(id=['feature_id','original_id'])
+    for f in file_names:
+        os.rename(f, "%s/trimmed_fasta_alignments/%s"%(folder,f))
+        
+    from glob import glob
+    from shutil import copyfile
+    notebooks = glob('*.ipynb')
+    for n in notebooks:
+        copyfile(n, '%s/%s'%(folder,n))
+        
     pj.write(folder+'/sequences_and_metadata.gb','genbank')
     report = open(folder+'/report.html','wt')
     lines = report_methods(pj, figures_folder, folder_name, size,
@@ -5055,7 +5072,7 @@ def calc_rf(pj, figs_folder, rf_type='proportional',meta=None, mp_root=False, tr
                 line.append(rf/float(max_rf))   
             elif rf_type == 'proportional':
                 #print 'DEBUG: in proportional'
-                warnings.warn('Trees must have the same taxa')
+                warnings.warn('proportional branch-distance: Trees must have the same taxa')
                 line.append(get_corrected_kuhner_felsenstein(dupT1, dupT2, unrooted_trees=unrooted_trees))
             #to do
             #elif rf_type == deep_nodes more important:
@@ -6148,6 +6165,8 @@ class LociStats:
                 stop = True
         
         return concatenations
+    
+    
 
 if __name__ == "__main__":
     import doctest
