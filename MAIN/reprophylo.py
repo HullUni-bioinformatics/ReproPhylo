@@ -1756,6 +1756,8 @@ class Project:
         """
         if format == 'nexml':
             self.write_nexml(filename)
+        if format == 'phyloxml':
+            self.write_phyloxml(filename)
         elif format == 'genbank' or format == 'embl':
             SeqIO.write(self.records, filename, format)
         elif format == 'csv':
@@ -2173,7 +2175,7 @@ class Project:
                     if not all(i.split('_')[0] in locus_feature_ids for i in value):
                         print [i.split('_')[0] for i in value if not i.split('_')[0] in locus_feature_ids]
                         warnings.warn('Not all records to exclude exist in locus. Typos?')
-                    if start_from_max:
+                    if start_from_max and not keep_safe == {}:
                         for record in keep_safe[key]:
                             if not record.id.split('_')[0] in [i.split('_')[0] for i in value]:
                                 subset.append(record)
@@ -2826,7 +2828,87 @@ class Project:
             annotations_as_nhx=False,
             exclude_trees=False)
 
+    def write_phyloxml(self, filename):
 
+        phyloxmls = []
+
+        from Bio import Phylo
+        from StringIO import StringIO
+
+        for token in self.trees.keys():
+            tree = Phylo.read(StringIO(self.trees[token][0].write(format=2)), 'newick')
+            xmltree = tree.as_phyloxml()
+            xmltree.name = token
+
+            aln= None
+            trimaln= None
+
+            alnlookup = None
+            trimalnlookup = None
+
+            if token.split('@')[0] in [l.name for l in self.loci]:
+
+                aln = self.alignments['%s@%s'%(token.split('@')[0], token.split('@')[1])]
+                alnlookup = dict((rec.id, str(rec.seq)) for rec in aln)
+
+                trimaln = self.alignments['%s@%s@%s'%(token.split('@')[0],
+                                                    token.split('@')[1],
+                                                    token.split('@')[2])]
+                trimalnlookup = dict((rec.id, str(rec.seq)) for rec in trimaln)
+
+            elif token.split('@')[0] in [c.name for c in self.concatenations]:
+
+                trimaln = self.trimmed_alignments[token.split('@')[0]]
+                trimalnlookup = dict((rec.id, str(rec.seq)) for rec in trimaln)
+
+            else:
+                raise RuntimeError('No locus or concatenation for tree %s'%token)
+
+            for clade in xmltree.get_terminals():
+                typ = 'dna'
+                if (alnlookup and
+                    [l for l in self.loci if l.name == token.split('@')[0]][0].char_type == 'prot'):
+                    typ = 'protein'
+                key = clade.name
+                feautre_id = key
+                if not alnlookup:
+                    feature_id = (self.trees[token][0]&key).feature_id
+
+                dbtype = 'NCBI'
+                if alnlookup and 'denovo' in key:
+                    dbtype= 'denovo'
+                elif not alnlookup:
+                    dbtype= 'otu'
+
+                accession = Phylo.PhyloXML.Accession(key, dbtype)
+                mol_seq = Phylo.PhyloXML.MolSeq(trimalnlookup[key], is_aligned=True)
+                sequence = Phylo.PhyloXML.Sequence(type=typ,
+                                                   accession=accession,
+                                                   mol_seq=mol_seq,
+                                                   annotations=[Phylo.PhyloXML.Annotation(evidence='trimmed')])
+
+                if alnlookup:
+                    mol_seq = Phylo.PhyloXML.MolSeq(alnlookup[key], is_aligned=True)
+                    sequence = Phylo.PhyloXML.Sequence(type=typ,
+                                                       accession=accession,
+                                                       mol_seq=mol_seq)
+
+
+                clade.sequences.append(sequence)
+
+            others = [Phylo.PhyloXML.Other(tag='trimmedaln',
+                                           attributes={'treename':token},
+                                           value=trimaln.format('phylip-relaxed'))]
+            if aln:
+                others.append(Phylo.PhyloXML.Other(tag='aln',
+                                                   attributes={'treename':token},
+                                                   value=aln.format('phylip-relaxed')))
+            xmltree.other = others 
+
+            phyloxmls.append(xmltree)  
+
+        Phylo.write(phyloxmls, filename, 'phyloxml')
+        
 
     def annotate(self, fig_folder,
     
@@ -4751,17 +4833,17 @@ def publish(pj, folder_name, figures_folder, size='small',
         raise IOError(folder_name + ' already exists')
     
     os.makedirs(folder)
-    pj.write(folder+'/tree_and_alns.nexml','nexml')
+    pj.write(folder+'/tree_and_alns.xml','phyloxml')
     
-    os.mkdir(folder+'/fasta_alignments')
-    file_names = pj.write_alns(id=['feature_id','original_id'])
-    for f in file_names:
-        os.rename(f, "%s/fasta_alignments/%s"%(folder,f))
+    #os.mkdir(folder+'/fasta_alignments')
+    #file_names = pj.write_alns(id=['feature_id','original_id'])
+    #for f in file_names:
+    #    os.rename(f, "%s/fasta_alignments/%s"%(folder,f))
         
-    os.mkdir(folder+'/trimmed_fasta_alignments')
-    file_names = pj.write_alns(id=['feature_id','original_id'])
-    for f in file_names:
-        os.rename(f, "%s/trimmed_fasta_alignments/%s"%(folder,f))
+    #os.mkdir(folder+'/trimmed_fasta_alignments')
+    #file_names = pj.write_alns(id=['feature_id','original_id'])
+    #for f in file_names:
+    #    os.rename(f, "%s/trimmed_fasta_alignments/%s"%(folder,f))
         
     from glob import glob
     from shutil import copyfile
