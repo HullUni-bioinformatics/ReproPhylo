@@ -2206,7 +2206,7 @@ class Project:
                         if record.id.split('_')[0] in [i.split('_')[0] for i in value]:
                             subset.append(record)
                     self.records_by_locus[key] = subset
-                    if not start_from_null:
+                    if not start_from_null and not keep_safe == {}:
                         self.records_by_locus[key] = subset+keep_safe[key]
             else:
                 warnings.warn('Locus name %s not recognised'%key)
@@ -2645,7 +2645,7 @@ class Project:
                     # find the number of chains
                     nchains = raxml_method.cline_args['nchain'].split()[0]
                     chain_names = ''
-                    for i in range(1,str(nchains)+1):
+                    for i in range(1,int(nchains)+1):
                         chain_names += "%s.%i "%(base_name, i)
                     chain_names = chain_names[:-1]
                     bpcomp_cline = "%s -c %f -x %i %i %s"%(bpcomp,
