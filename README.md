@@ -16,3 +16,4 @@ We welcome your additions and improvements, just fork the repository on GitHub a
 2. [The Dockerfile repository](https://github.com/HullUni-bioinformatics/ReproPhyloDockerfile) - contains the Dockerfile with its dependecies. You can use [Docker](https://www.docker.com/) to build a Docker image locally using this reporitory.
 3. [The Galaxy distribution repository](https://github.com/HullUni-bioinformatics/ReproPhyloGalaxy) - A Galaxy distriution including the Galaxy ReproPhylo tools, their dependencies and an INSTALL file.
 4. [The DockerHub reporitory](https://registry.hub.docker.com/u/szitenberg/reprophylo/) - A [Docker](https://www.docker.com/) image of the python module in an [IPython notebook](http://ipython.org/notebook.html) environment.
+5. [WinPython version with ReproPhylo](https://www.dropbox.com/s/anr4yx1prk6n16d/WinPython-64bit-2.7.9.5_rp1.zip?dl=0), requires Git and Perl
