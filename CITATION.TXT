@@ -1,9 +1,12 @@
-Szitenberg A, Lunt DH (2014) ReproPhylo - a reproducible phylogenomics pipeline. https://github.com/HullUni-bioinformatics/ReproPhylo
+Szitenberg A, John M, Blaxter LM and Lunt DH (2015) ReproPhylo: An Environment for Reproducible Phylogenomics. bioRxiv, doi: 10.1101/019349
 
-@MISC{Szitenberg_undated-jk,
-  title     = "{ReproPhylo} - a reproducible phylogenomics pipeline",
-  booktitle = "{GitHub}",
-  author    = "Szitenberg, Amir and Lunt, David H",
-  abstract  = "ReproPhylo - Reproducible Phylogenomics",
-  copyright = "CCO"
+@ARTICLE{Szitenberg2015,
+AUTHOR="A. Szitenberg and M. John and M.L Blaxter and D.H. Lunt",
+TITLE="ReproPhylo: An Environment for Reproducible Phylogenomics",
+JOURNAL="bioRxiv",
+year = 2015,
+doi = {10.1101/019349},
+url = {http://dx.doi.org/10.1101/019349}
+
 }
+

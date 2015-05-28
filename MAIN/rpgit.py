@@ -53,7 +53,7 @@ def gitStatus(repoDir=repoDir):
     return out, error
 
 def gitCommit(commitMessage, repoDir=repoDir):
-    cmd = 'git commit -m "%s"'%commitMessage
+    cmd = 'git commit -m "%s"'%(commitMessage.replace('\"','\''))
     #print 'DEBUG gitCommit: %s'%cmd
     pipe = Popen(cmd, shell=True, cwd=repoDir,stdout = PIPE,stderr = PIPE )
     (out, error) = pipe.communicate()
