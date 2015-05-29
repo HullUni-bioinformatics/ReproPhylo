@@ -17,3 +17,17 @@ We welcome your additions and improvements, just fork the repository on GitHub a
 3. [The Galaxy distribution repository](https://github.com/HullUni-bioinformatics/ReproPhyloGalaxy) - A Galaxy distriution including the Galaxy ReproPhylo tools, their dependencies and an INSTALL file.
 4. [The DockerHub reporitory](https://registry.hub.docker.com/u/szitenberg/reprophylo/) - A [Docker](https://www.docker.com/) image of the python module in an [IPython notebook](http://ipython.org/notebook.html) environment.
 5. [WinPython version with ReproPhylo](https://www.dropbox.com/s/anr4yx1prk6n16d/WinPython-64bit-2.7.9.5_rp1.zip?dl=0), requires Git and Perl
+  
+<p xmlns:dct="http://purl.org/dc/terms/">
+  <a rel="license"
+     href="http://creativecommons.org/publicdomain/zero/1.0/">
+    <img src="http://i.creativecommons.org/p/zero/1.0/88x31.png" style="border-style: none;" alt="CC0" />
+  </a>
+  <br />
+  To the extent possible under law,
+  <a rel="dct:publisher"
+     href="http://hulluni-bioinformatics.github.io/ReproPhylo/">
+    <span property="dct:title">EvoHull</span></a>
+  has waived all copyright and related or neighboring rights to
+  <span property="dct:title">ReproPhylo</span>.
+</p>
