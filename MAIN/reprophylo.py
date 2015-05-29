@@ -4044,7 +4044,9 @@ class RaxmlConf:
         aln_string = aln_string[:-1]
         command_lines = ''
         for i in self.command_lines.keys():
-            command_lines += i+': '+str(self.command_lines[i])+'\n'
+            command_lines += i+':\n'
+            for k in self.command_lines[i]:
+                command_lines += str(k) + '\n'
         date = str(self.timeit[0])
         
         execution = '[This was not executed yet]'
