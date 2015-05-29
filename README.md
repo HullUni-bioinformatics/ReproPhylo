@@ -26,7 +26,7 @@ We welcome your additions and improvements, just fork the repository on GitHub a
   <br />
   To the extent possible under law,
   <a rel="dct:publisher"
-     href="http://hulluni-bioinformatics.github.io/ReproPhylo/">
+     href="http://www.evohull.org/">
     <span property="dct:title">EvoHull</span></a>
   has waived all copyright and related or neighboring rights to
   <span property="dct:title">ReproPhylo</span>.

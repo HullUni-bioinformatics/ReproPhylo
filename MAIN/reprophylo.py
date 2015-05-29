@@ -2175,7 +2175,7 @@ class Project:
                     if not all(i.split('_')[0] in locus_feature_ids for i in value):
                         print [i.split('_')[0] for i in value if not i.split('_')[0] in locus_feature_ids]
                         warnings.warn('Not all records to exclude exist in locus. Typos?')
-                    if start_from_max and not keep_safe == {}:
+                    if not start_from_max and not keep_safe == {}:
                         for record in keep_safe[key]:
                             if not record.id.split('_')[0] in [i.split('_')[0] for i in value]:
                                 subset.append(record)
