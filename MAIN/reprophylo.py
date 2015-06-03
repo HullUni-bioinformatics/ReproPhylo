@@ -1,4 +1,4 @@
-reprophyloversion="99c16963"
+reprophyloversion=1.0
 ############################################################################################
 if False:
     """
@@ -533,7 +533,7 @@ def get_qualifiers_dictionary(project, feature_id):
     >>> feature.location = location
     >>> feature.type = 'CDS'
     >>> feature.qualifiers['gene'] = ['CoI']
-    >>> feature.qualifiers['feature_id'] = ['12345']
+    >>> feature.qualifiers['feature_id'] = ['1_f0']
     >>> source = SeqFeature()
     >>> source.location = FeatureLocation(0,3999)
     >>> source.type = 'source'
@@ -545,21 +545,22 @@ def get_qualifiers_dictionary(project, feature_id):
     >>> pj.records = [record]
     
     # executing get_qualifiers_dictionary()
-    >>> qual_dict = get_qualifiers_dictionary(pj, '12345')
+    >>> qual_dict = get_qualifiers_dictionary(pj, '1_f0')
     >>> qual_items = qual_dict.items()
     >>> qual_items.sort(key = lambda i: i[0])
     >>> for key, val in qual_items: print(key.ljust(20,' ') + val.ljust(20,' '))
     annotation_evidence made up             
-    feature_id          12345               
+    feature_id          1_f0                
     gene                CoI                 
+    record_id           1                   
     source_organism     Tetillda radiata    
     """
     if type(feature_id) is list and len(feature_id) > 1:
         raise IOError('get_qualifiers_dictionary takes one feature_id at a time')
     if type(feature_id) is list:
         feature_id = feature_id[0]
-    record_id = feature_id.split('_')[0]
-    qualifiers_dictionary={}
+    record_id = feature_id.rpartition('_')[0]
+    qualifiers_dictionary={'record_id': record_id}
     for record in project.records:
         if record.id in feature_id:
             for annotation in record.annotations.keys():
@@ -585,9 +586,9 @@ def __get_qualifiers_dictionary__(project, feature_id):
         raise IOError('get_qualifiers_dictionary takes one feature_id at a time')
     if type(feature_id) is list:
         feature_id = feature_id[0]
-    record_id = feature_id.split('_')[0]
+    record_id = feature_id.rpartition('_')[0]
     record = project._records_dict[record_id]
-    qualifiers_dictionary={}
+    qualifiers_dictionary={'record_id': record_id}
     for annotation in record.annotations.keys():
         qualifiers_dictionary['annotation_'+annotation]=record.annotations[annotation]
     for feature in record.features:
@@ -1956,6 +1957,7 @@ class Project:
         product                                 cytoc...
         prot_degen_prop                         0.0...
         protein_id                              AFM91...
+        record_id                               JX177...
         source_country                          Panam...
         source_db_xref                          taxon...
         source_feature_id                       JX177...
@@ -3252,6 +3254,8 @@ class Project:
         its key, as long as there is only one
         """
         
+        from StringIO import StringIO
+        
         # check how many aln keys match the token
         keys = [key for key in self.alignments.keys() if token in key]
         if len(keys) > 1:
@@ -3262,7 +3266,7 @@ class Project:
                           %token)
         elif len(keys) == 1:
             print "returning alignment object %s"%keys[0]
-            return self.alignments[keys[0]]        
+            return AlignIO.read(StringIO(self.alignments[keys[0]].format('fasta')), 'fasta')        
         
         
     def fta(self, token):
@@ -3271,6 +3275,8 @@ class Project:
         Will fetch the trimmed alignment object which has the token in 
         its key, as long as there is only one
         """
+        
+        from StringIO import StringIO
         
         # check how many trimmed aln keys match the token
         keys = [key for key in self.trimmed_alignments.keys() if token in key]
@@ -3282,7 +3288,7 @@ class Project:
                           %token)
         elif len(keys) == 1:
             print "returning trimmed alignment object %s"%keys[0]
-            return self.trimmed_alignments[keys[0]]            
+            return AlignIO.read(StringIO(self.trimmed_alignments[keys[0]].format('fasta')), 'fasta')            
         
         
     def fr(self, locus_name, filter=None):
