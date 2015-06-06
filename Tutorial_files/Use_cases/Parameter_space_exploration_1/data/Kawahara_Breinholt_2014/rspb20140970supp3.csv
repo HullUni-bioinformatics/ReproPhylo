@@ -1,0 +1,49 @@
+Supplementary Table 1. Summary statistics and GenBank SRA accession numbers for assembled Illumina-based transcriptomes (40 taxa) and EST (1 taxon) and genomic gene sets (5 taxa) used in this study. GenBank SRA accession numbers in bold were generated for this study. Species in the SH-like analyses are indicated with an asterisk.																
+																
+Superfamily	Family	Taxa	Sample ID	Collection country/region	Locality	Collector	Collection date	Minimum contig size	Mean contig size	Maximum contig size	N50	# of contigs	Total bp	Data type	#taxa Per lane	Genbank SRA accession number
+Adeloidea	Adelidae	Nemophora sp.	SW130206	Malaysia	Sarawak: Kuching, Padawan	A.Y. Kawahara	Apr. 8-19, 2013	100	385	10485	573	76495	29412852	PE150	12	SRR1299782 
+Bombycoidea	Bombycidae	Bombyx mori*	Bmoricds	N/A	N/A	N/A	N/A	87	1224	56289	1698	14623	17891307	Genomic gene set	N/A	N/A
+Bombycoidea	Saturniidae	Actias luna*	acti2	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Mar. 2013	100	356	8884	508	113460	40403778	SE100	4	SRR1002974
+Bombycoidea	Saturniidae	Eacles sp.	FG120096B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	311	6494	386	113306	35207443	SE100	10	SRR1299435
+Bombycoidea	Saturniidae	Therinia lactucina	FG120016	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	266	12339	340	96815	25794506	SE100	10	SRR1299418
+Bombycoidea	Sphingidae	Adhemarius daphne	FG120049B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	372	7651	546	89445	33235621	SE100	10	SRR1299394
+Bombycoidea	Sphingidae	Enyo lugubris	elug1	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Mar. 2013	100	356	11248	495	88725	31604835	SE100	10	SRR1002983
+Bombycoidea	Sphingidae	Hemaris diffinis	HEMA2	USA	Florida: Alachua County, Archer	A.Y. Kawahara	Mar. 2013	100	334	9229	450	133899	44764693	SE100	10	SRR1002987
+Bombycoidea	Sphingidae	Xylophanes tersa	Xter2	N/A	N/A	N/A	N/A	100	306	6264	420	78388	24006581	SE100	10	SRR1298384
+Bombycoidea	Sphingidae	Manduca sexta*	Msexta	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	June 2012	6	1192	62024	1860	20759	24748686	Genomic gene set	N/A	N/A
+Calliduloidea	Callidulidae	Pterodecta felderi*	Callid	Japan	Hokkaido, near Mt. Daisetsu	A.Y. Kawahara	August, 2012	100	335	11770	467	83540	27945002	SE100	10	SRR1299369
+Cossoidea	Cossidae	Morpheis mathani*	FG120022	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	420	12166	743	56259	23632099	SE100	10	SRR1299214
+Gelechioidea	Gelechiidae	Dichomeris sp.	SW130197	Malaysia	Sarawak: Kuching: Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	429	11311	732	41030	17605958	PE150	12	SRR1299773
+Gelechioidea	Lecithoceridae	Thubana sp.*	SW130007	Malaysia	Sarawak: Kuching: Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	355	2431	577	1144	406352	SE100	10	SRR1300991
+Geometroidea	Geometridae	Macaria distribuaria	GNV120029	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Nov-Dec 2012	100	306	7255	417	54439	16631245	SE100	10	SRR1299213
+Geometroidea	Geometridae	Nemoria lixaria*	GNV120032	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Nov-Dec 2012	100	302	5462	385	91921	27760564	SE100	10	SRR1299347
+Geometroidea	Sematuridae	Nothus lunus*	FG120055B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	372	6475	544	84281	31341405	SE100	10	SRR1299318
+Geometroidea	Uraniidae	Lyssa zampa*	SW130126	Malaysia	Sarawak: Kuching, Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	405	8101	589	79338	32095197	PE150	12	SRR1299769
+Gracillarioidea	Gracillariidae	Phyllocnistis citrella*	Pcit2	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Feb. 2013	100	307	5987	394	140821	43238245	SE100	4	SRR1299751
+Hepialoidea	Hepialidae	Aepytus sp.	FG120028B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	373	10923	544	83109	31029314	SE100	10	SRR1299317
+Lasiocampoidea	Lasiocampidae	Artace sp.*	FG120070B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	318	13943	404	131850	41953009	SE100	10	SRR1299316
+Mimallonoidea	Mimallonidae	Lacosoma ludolpha*	FG120046B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	411	11414	697	88764	36486475	SE100	10	SRR1299212
+Noctuoidea	Erebidae	Eudocima salaminia*	SW130232	Malaysia	Sarawak: Kuching, Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	442	11192	747	60177	26588108	PE150	12	SRR1300148
+Noctuoidea	Euteliidae	Anigraea sp.	SW130103	Malaysia	Sarawak: Kuching, Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	387	10202	583	70613	27292515	PE150	12	SRR1299755
+Noctuoidea	Nolidae	Manoba major	SW130224	Malaysia	Sarawak: Kuching, Padawan	A.Y. Kawahara, J. Barber, P. Houlihan, W. Hsu	Apr. 8-19, 2013	100	461	10426	774	67659	31207110	PE150	12	SRR1300145
+Noctuoidea	Notodontidae	Notoplusia minuta	FG120015	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	358	6943	532	67432	24127993	PE150	12	SRR1299746
+Papilionoidea	Hedylidae	Macrosoma sp.*	FG120122	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	246	8384	302	29789	7315809	SE100	10	SRR1299306
+Papilionoidea	Hesperiidae	Hylephila phyleus	GNV120020	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Nov-Dec 2012	100	273	2044	350	36433	9939246	SE100	10	SRR1299296
+Papilionoidea	Hesperiidae	Megathymus yuccae*	GNV139000	USA	Florida: Marion County, Ocala Nat. Forest	A.Y. Kawahara, A.D. Warren	Mar. 2013	100	359	14198	610	142837	51339123	PE100	10	SRR1299752
+Papilionoidea	Lycaenidae	Hemiargus ceraunus*	GNV120025	USA	Florida: Alachua County, Gainesville	A.Y. Kawahara	Nov-Dec 2012	100	391	9778	593	84176	32881061	SE100	10	SRR1299274
+Papilionoidea	Lycaenidae	Semomesia campanea	FG120077	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	321	8032	420	120362	38604050	SE100	10	SRR1299211
+Papilionoidea	Nymphalidae	Bicyclus anynana	B_anynana	N/A	N/A	N/A	N/A	12	1264	561	674	39809	22326861	EST data	10	N/A
+Papilionoidea	Nymphalidae	Danaus plexippus*	Dplexcds	N/A	N/A	N/A	N/A	9	1383	58947	1989	15130	20922015	Genomic gene set	N/A	N/A
+Papilionoidea	Nymphalidae	Heliconius melpomene	hmelpcds	N/A	N/A	N/A	N/A	45	1776	55776	2890	15202	26995509	Genomic gene set	N/A	N/A
+Papilionoidea	Papilionidae	Papilio glaucus	SRR850324	N/A	N/A	N/A	N/A	100	372	8230	517	135506	50359761	PE100	N/A	SRR850324
+Papilionoidea	Papilionidae	Papilio polytes*	SRR850327	N/A	N/A	N/A	N/A	100	452	11006	812	71143	32144750	PE100	N/A	SRR850327
+Pterophoroidea	Pterophoridae	Lantanophaga pusillidactyla*	GNV120027	USA	Florida: Alachua County, Gainesville	D. Mathews-Lott	Nov-Dec 2012	100	291	4941	368	112343	32695805	SE100	10	SRR1299210
+Pyraloidea	Crambidae	Cnaphalocrocis medinalis	SRR647910	N/A	N/A	N/A	N/A	100	229	6541	259	116968	26771600	SE100	N/A	SRR647910-SRR647915
+Pyraloidea	Crambidae	Myelobia sp.*	FG120071B	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	356	16067	483	85482	30426844	SE100	10	SRR1299267
+Thyridoidea	Thyrididae	Pseudothyris sepulchralis	GNV139006	USA	Florida: Alachua County, Gainesville	L. Reeves	Mar. 2013	100	365	15685	510	104188	38056451	PE100	10	SRR1299495
+Thyridoidea	Thyrididae	Zeuzerodes maculata*	FG120079	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	417	9483	678	72979	30417704	SE100	10	SRR1299209
+Tortricoidea	Tortricidae	Grapholita dimorpha*	SRR803483	N/A	N/A	N/A	N/A	100	245	4331	285	207081	50777895	PE100	N/A	SRR803483
+Urodoidea	Urodidae	Urodus parvula*	GNV129007	USA	Florida: Levy County, Goethe State Forest	J.E. Hayden	Jan. 12, 2013	100	369	2554	596	1146	422751	PE100	12	SRR1299750
+Yponomeutoidea	Plutellidae	Plutella xylostella*	PXYLO	N/A	N/A	N/A	N/A	153	1385	46479	1998	18073	25036665	Genomic gene set	N/A	N/A
+Zygaenoidea	Dalceridae	Dalcera abrasa*	FG120035	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	373	12939	561	108593	40511487	SE100	10	SRR1299208
+Zygaenoidea	Megalopygidae	Megalopyge tharops*	FG120024	France (French Guiana)	Nouragues, Parare	A.Y. Kawahara, J. Barber, J. Breinholt, B. Leavell	Oct. 8-18, 2012	100	385	8994	597	89496	34429535	SE100	10	SRR1299217
