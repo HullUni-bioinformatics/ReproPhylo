@@ -4241,7 +4241,7 @@ def draw_boxplot(dictionary, y_axis_label, figs_folder): #'locus':[values]
     
 #################################################################################
 def report_methods(pj, figs_folder, output_directory, size='small',
-                   compare_trees=None, compare_meta=None, trees_to_compare='all',
+                   compare_trees=[], compare_meta=None, trees_to_compare='all',
                    unrooted_trees=False, mp_root=True):
 #################################################################################
         """
@@ -4824,7 +4824,7 @@ def revert_pickle(pj, commit_hash):
 
 
 def publish(pj, folder_name, figures_folder, size='small',
-            compare_trees=None, compare_meta=None, trees_to_compare='all',
+            compare_trees=[], compare_meta=None, trees_to_compare='all',
             unrooted_trees=False):
     
     import os, time
