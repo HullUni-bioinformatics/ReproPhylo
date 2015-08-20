@@ -2853,7 +2853,7 @@ class Project:
                 aln = self.alignments['%s@%s'%(token.split('@')[0], token.split('@')[1])]
                 alnlookup = dict((rec.id, str(rec.seq)) for rec in aln)
 
-                trimaln = self.alignments['%s@%s@%s'%(token.split('@')[0],
+                trimaln = self.trimmed_alignments['%s@%s@%s'%(token.split('@')[0],
                                                     token.split('@')[1],
                                                     token.split('@')[2])]
                 trimalnlookup = dict((rec.id, str(rec.seq)) for rec in trimaln)

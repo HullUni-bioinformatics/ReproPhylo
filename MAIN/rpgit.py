@@ -55,8 +55,27 @@ def gitStatus(repoDir=repoDir):
 def gitCommit(commitMessage, repoDir=repoDir):
     cmd = 'git commit -m "%s"'%(commitMessage.replace('\"','\''))
     #print 'DEBUG gitCommit: %s'%cmd
-    pipe = Popen(cmd, shell=True, cwd=repoDir,stdout = PIPE,stderr = PIPE )
-    (out, error) = pipe.communicate()
+    try:
+        pipe = Popen(cmd, shell=True, cwd=repoDir,stdout = PIPE,stderr = PIPE )
+        (out, error) = pipe.communicate()
+    except:
+        try:
+            hndl = open('faulty_git_commit_messages', 'a')
+            hndl.write(commitMessage + '\n')
+            hndl.close()
+            commitMessage = commitMessage.splitlintes()[0] + '\nSee faulty_git_commit_messages for more details.'
+            cmd = 'git commit -m "%s"'%(commitMessage.replace('\"','\''))
+            pipe = Popen(cmd, shell=True, cwd=repoDir,stdout = PIPE,stderr = PIPE )
+            (out, error) = pipe.communicate()
+        except:
+            hndl = open('faulty_git_commit_messages', 'a')
+            hndl.write(commitMessage + '\n')
+            hndl.close()
+            commitMessage = "Commit successful but something very wrong with message.\nSee faulty_git_commit_messages for more details."
+        cmd = 'git commit -m "%s"'%(commitMessage.replace('\"','\''))
+        pipe = Popen(cmd, shell=True, cwd=repoDir,stdout = PIPE,stderr = PIPE )
+        (out, error) = pipe.communicate()
+        
     #print 'DEBUG gitCommit STDOUT: %s'%out
     #print 'DEBUG gitCommit STDERR: %s'%error
     pipe.wait()
