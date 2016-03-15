@@ -1,4 +1,4 @@
-reprophyloversion=1.0
+reprophyloversion=1.3
 ############################################################################################
 if False:
     """
@@ -273,7 +273,7 @@ def start_git(pj):
     
     
     
-def stop_git():
+def stop_git(pj):
     __builtin__.git = False # flad it off
     cwd = os.getcwd()
     
@@ -2262,13 +2262,18 @@ class Project:
                                            'Nucleic Acids Research 32(5):1792-1797')
                 elif method.program_name == 'mafft':
                     p = sub.Popen(method.cmd+" --version", shell=True, stderr=sub.PIPE, stdout=sub.PIPE)
-                    # new version of MAFFT  7.221 sends version to stderr 
+                    
                     try:
-                        method.platform.append('Program and version: '+
-                                               p.communicate()[1].splitlines()[3].strip().split(' (')[0])
+                         method.platform.append('Program and version: '+
+                                                p.communicate()[1].splitlines()[3].strip().split(' (')[0])
                     except:
-                        method.platform.append('Program and version: '+
-                                               p.communicate()[1].split(' (')[0])
+                        # new version of MAFFT  7.221 sends version to stderr
+                        try:
+                             method.platform.append('Program and version: '+
+                                                    p.communicate()[1].split(' (')[0])
+                        except:
+                            method.platform.append('Program and version: not_retrived')
+                        
                     method.platform.append('Program reference:Katoh, Standley 2013 (Molecular Biology and Evolution 30:772-780) '+
                                            'MAFFT multiple sequence alignment software version 7: improvements in performance and usability.')
                 
@@ -5897,7 +5902,7 @@ def get_gapscores(pj, trimmed = True, alignmnet_method=None, trimming_method=Non
             elif aln_name.split('@')[0] in [i.split('@')[0] for i in gapscores.keys()]:
                 exists = [i for i in gapscores.keys() if i.split('@')[0] == aln_name.split('@')[0]][0]
                 get = False
-                warning.warn('Skipping %s, already have %s'%aln_name, exists)   
+                warnings.warn('Skipping %s, already have %s'%aln_name, exists)   
         if get:    
             char_type = char_type_list[0]
             aln_obj = aln_dict[aln_name]
@@ -5944,7 +5949,7 @@ def get_conservations(pj, trimmed = True, alignmnet_method=None, trimming_method
             elif aln_name.split('@')[0] in [i.split('@')[0] for i in conservations.keys()]:
                 exists = [i for i in conservations.keys() if i.split('@')[0] == aln_name.split('@')[0]][0]
                 get = False
-                warning.warn('Skipping %s, already have %s'%aln_name, exists)       
+                warnings.warn('Skipping %s, already have %s'%aln_name, exists)       
         if get:    
             char_type = char_type_list[0]
             aln_obj = aln_dict[aln_name]
@@ -6045,9 +6050,9 @@ class LociStats:
         >>> stats = LociStats(pj)
         >>> entropies = stats.entropies['dummy@ReadDirectly@no_trim']
         >>> stats.sort()
-        >>> np.percentile(entropies,25)
+        >>> abs(np.percentile(entropies,25))
         0.0
-        >>> np.percentile(entropies,50)
+        >>> abs(np.percentile(entropies,50))
         0.0
         >>> conservation = stats.conservations['dummy1@ReadDirectly@no_trim']
         >>> np.percentile(conservation,25)
