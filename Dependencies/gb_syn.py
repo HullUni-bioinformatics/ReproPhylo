@@ -1,15 +1,15 @@
 
 def gb_syn():
     return  [
-            ['MT-CO1','cox1','COX1','COI','coi','cytochome oxidase 1','cytochome oxidase I',
-             'cytochome oxidase subunit 1','cytochome oxidase subunit I',
+            ['MT-CO1','cox1','COX1','COI','coi','cytochrome oxidase 1','cytochrome oxidase I',
+             'cytochrome oxidase subunit 1','cytochrome oxidase subunit I',
              'cox I','coxI', 'cytochrome c oxidase subunit I','CO1','cytochrome oxidase subunit 1',
             'cytochrome oxidase subunit I'],
-            ['MT-CO2','cox2','COX2','COII','coii','cytochome oxidase 2','cytochome oxidase II',
-             'cytochome oxidase subunit 2','cytochome oxidase subunit II','cox II',
+            ['MT-CO2','cox2','COX2','COII','coii','cytochrome oxidase 2','cytochrome oxidase II',
+             'cytochrome oxidase subunit 2','cytochrome oxidase subunit II','cox II',
              'cytochrome c oxidase subunit II'],
-            ['MT-CO3','cox3','COX3','COIII','coiii','cytochome oxidase 3',
-             'cytochome oxidase III','cytochome oxidase subunit 3','cytochome oxidase subunit III'
+            ['MT-CO3','cox3','COX3','COIII','coiii','cytochrome oxidase 3',
+             'cytochrome oxidase III','cytochrome oxidase subunit 3','cytochrome oxidase subunit III'
              ,'cox III','cytochrome c oxidase subunit III'],
             ['18s','18S','SSU rRNA','18S ribosomal RNA','small subunit 18S ribosomal RNA', '18S rRNA'],
             ['28s','28S','LSU rRNA','28S ribosomal RNA','28S large subunit ribosomal RNA'],
