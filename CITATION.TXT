@@ -1,12 +1,16 @@
-Szitenberg A, John M, Blaxter LM and Lunt DH (2015) ReproPhylo: An Environment for Reproducible Phylogenomics. bioRxiv, doi: 10.1101/019349
+Szitenberg A, John M, Blaxter ML, Lunt DH (2015) ReproPhylo: An Environment for Reproducible Phylogenomics. PLoS Comput Biol 11(9): e1004447. doi: 10.1371/journal.pcbi.1004447
 
-@ARTICLE{Szitenberg2015,
-AUTHOR="A. Szitenberg and M. John and M.L Blaxter and D.H. Lunt",
-TITLE="ReproPhylo: An Environment for Reproducible Phylogenomics",
-JOURNAL="bioRxiv",
-year = 2015,
-doi = {10.1101/019349},
-url = {http://dx.doi.org/10.1101/019349}
-
+@article{10.1371/journal.pcbi.1004447,
+    author = {Szitenberg, Amir AND John, Max AND Blaxter, Mark L. AND Lunt, David H.},
+    journal = {PLoS Comput Biol},
+    publisher = {Public Library of Science},
+    title = {ReproPhylo: An Environment for Reproducible Phylogenomics},
+    year = {2015},
+    month = {09},
+    volume = {11},
+    url = {http://dx.doi.org/10.1371%2Fjournal.pcbi.1004447},
+    pages = {1-13},
+    abstract = {<p>The reproducibility of experiments is key to the scientific process, and particularly necessary for accurate reporting of analyses in data-rich fields such as phylogenomics. We present ReproPhylo, a phylogenomic analysis environment developed to ensure experimental reproducibility, to facilitate the handling of large-scale data, and to assist methodological experimentation. Reproducibility, and instantaneous repeatability, is built in to the ReproPhylo system and does not require user intervention or configuration because it stores the experimental workflow as a single, serialized Python object containing explicit provenance and environment information. This ?single file? approach ensures the persistence of provenance across iterations of the analysis, with changes automatically managed by the version control program Git. This file, along with a Git repository, are the primary reproducibility outputs of the program. In addition, ReproPhylo produces an extensive human-readable report and generates a comprehensive experimental archive file, both of which are suitable for submission with publications. The system facilitates thorough experimental exploration of both parameters and data. ReproPhylo is a platform independent CC0 Python module and is easily installed as a Docker image or a WinPython self-sufficient package, with a Jupyter Notebook GUI, or as a slimmer version in a Galaxy distribution.</p>},
+    number = {9},
+    doi = {10.1371/journal.pcbi.1004447}
 }
-
