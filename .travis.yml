@@ -1,1 +1,6 @@
-script echo "hello world"
+language: python
+python:
+  - "2.7"" # 3.5 development branch
+# command to install dependencies
+# command to run tests
+script: nosetests
