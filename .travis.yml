@@ -3,4 +3,4 @@ python:
   - "2.7"
 # command to install dependencies
 # command to run tests
-script: nosetests
+script: nosetests ./MAIN/reprophylo.py
